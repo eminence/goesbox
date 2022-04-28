@@ -21,8 +21,6 @@ image = "0.22"
 acres = {path = "/nas/achin/devel/acres"}
 lru-cache = "0.1.2"
 
-[workspace]
-members = ["goeslib", "goes-ui"]
 
 [profile.release]
 debug = true

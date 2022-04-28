@@ -232,28 +232,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "goes-ui"
-version = "0.1.0"
-
-[[package]]
-name = "goeslib"
-version = "0.1.0"
-dependencies = [
- "acres",
- "byteorder",
- "crossbeam",
- "crossbeam-channel",
- "image",
- "inflate",
- "log",
- "lru-cache",
- "nanomsg",
- "termion",
- "tui",
- "zip",
-]
-
-[[package]]
 name = "image"
 version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
