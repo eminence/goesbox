@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 
+use crossbeam_channel::Sender;
 use std::io;
 use termion::raw::IntoRawMode;
 use tui::backend::Backend;
@@ -10,9 +11,6 @@ use tui::layout::{Constraint, Corner, Direction, Layout, Rect};
 use tui::widgets::{BarChart, Block, Borders, List, Paragraph, Text, Widget};
 use tui::Frame;
 use tui::Terminal;
-
-use crossbeam::channel::unbounded;
-use crossbeam::channel::Sender;
 
 use crate::lrit::*;
 
@@ -114,7 +112,7 @@ pub struct App {
 }
 
 pub struct AppLogger {
-    app_channel: crossbeam::channel::Sender<String>,
+    app_channel: Sender<String>,
 }
 
 impl AppLogger {

@@ -5,8 +5,11 @@ version = 3
 [[package]]
 name = "acres"
 version = "0.1.0"
+source = "git+https://github.com/agrif/acres#afde220cbe4343809138f195284d908cf12153a7"
 dependencies = [
+ "bitflags",
  "libaec-sys",
+ "libc",
 ]
 
 [[package]]
@@ -368,9 +371,10 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 [[package]]
 name = "libaec-sys"
 version = "0.1.0"
+source = "git+https://github.com/agrif/acres#afde220cbe4343809138f195284d908cf12153a7"
 dependencies = [
- "cc",
  "cmake",
+ "libc",
 ]
 
 [[package]]

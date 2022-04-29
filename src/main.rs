@@ -27,13 +27,17 @@ use crc::calc_crc;
 
 pub mod handlers;
 
-
 pub fn set_panic_handler() {
-
     let old_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
         // log this panic to disk:
-        if let Ok(mut file) = std::fs::OpenOptions::new().write(true).append(true).create(true).truncate(false).open("panic.log") {
+        if let Ok(mut file) = std::fs::OpenOptions::new()
+            .write(true)
+            .append(true)
+            .create(true)
+            .truncate(false)
+            .open("panic.log")
+        {
             let _ = writeln!(file, "======");
             let _ = writeln!(file, "Panic!");
             let payload = info.payload();
@@ -48,13 +52,9 @@ pub fn set_panic_handler() {
             if let Some(loc) = info.location() {
                 let _ = writeln!(file, "Location: {}", loc);
             }
-
         }
         old_hook(info)
-
     }));
-
-
 }
 
 fn main() -> Result<(), io::Error> {

@@ -1,11 +1,11 @@
+use crate::handlers::ImageHandler;
 use byteorder::{NetworkEndian, ReadBytesExt};
 use log::{info, warn};
 use std::any::Any;
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::io::{Read, Write};
 use std::ops::Deref;
-use crate::handlers::ImageHandler;
-use std::fmt::Debug;
 
 // M_SDU -- Multiplexing Service Data Unit
 // VCLC -- Virtual Channel Link Control
@@ -24,12 +24,17 @@ fn diff_with_wrap(low: u32, high: u32, max: u32) -> u32 {
 #[derive(Clone)]
 pub struct LRIT {
     pub headers: Headers,
-    pub data: Vec<u8>
+    pub data: Vec<u8>,
 }
 
 impl Debug for LRIT {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-        write!(f, "<LRIT headers: {:?} data.len: {}", self.headers, self.data.len())
+        write!(
+            f,
+            "<LRIT headers: {:?} data.len: {}",
+            self.headers,
+            self.data.len()
+        )
     }
 }
 
@@ -261,30 +266,31 @@ impl TP_PDU {
 
 enum DecompInfo {
     NoneNeeded,
-    Needed(acres::SZ_com_t)
+    Needed((acres::sz::Parameters, usize)),
 }
 
 struct Session {
     bytes: Vec<u8>,
     last_seq: u16,
     apid: u16,
-    needs_decomp: DecompInfo
-
+    needs_decomp: DecompInfo,
 }
 
 /// Returns true if we need to decompress
 fn check_headers_for_rice_compression(bytes: &[u8]) -> DecompInfo {
     let headers = read_headers(bytes);
     if let (Some(ref ish), Some(ref rice)) = (headers.img_strucutre, headers.rice_compression) {
-         return DecompInfo::Needed(acres::SZ_com_t {
-           options_mask: rice.flags as i32 | acres::SZ_RAW_OPTION_MASK,
-           bits_per_pixel: ish.bits_per_pixel as i32,
-           pixels_per_block: rice.pixels_per_block as i32,
-           pixels_per_scanline: ish.num_columns as i32
-         });
+        return DecompInfo::Needed((
+            acres::sz::Parameters::new(
+                acres::sz::Options::from_bits_truncate(rice.flags as u32),
+                ish.bits_per_pixel as usize,
+                rice.pixels_per_block as usize,
+                ish.num_columns as usize,
+            ),
+            ish.num_columns as usize,
+        ));
     }
     DecompInfo::NoneNeeded
-
 }
 
 impl Session {
@@ -321,41 +327,42 @@ impl Session {
                 // we have enough data to extract all the headers
 
                 check_headers_for_rice_compression(&bytes)
-
             } else {
                 warn!("Not enough data in first TP_PDU to extract all the headers (need {} bytes, but only have {} bytes)", prim.total_header_length, bytes.len());
                 DecompInfo::NoneNeeded
             }
-
         } else {
-            warn!("First TP_PDU didn't have enough data for a primary header (only {} bytes)", bytes.len());
+            warn!(
+                "First TP_PDU didn't have enough data for a primary header (only {} bytes)",
+                bytes.len()
+            );
             DecompInfo::NoneNeeded
         };
 
-        if let DecompInfo::Needed(_params) = needs_decomp {
+        if let DecompInfo::Needed(_params) = &needs_decomp {
             //info!("tp_pdu's in session {} need rice decompression", apid);
             let headers = read_headers(&bytes);
 
             let data = &bytes[headers.primary.total_header_length as usize..];
-            assert_eq!(data.len(), 0, "Expected data len to be zero, but was actually {}", data.len());
+            assert_eq!(
+                data.len(),
+                0,
+                "Expected data len to be zero, but was actually {}",
+                data.len()
+            );
             //info!("{} bytes to decompress, pixels per scanline {}", data.len(), params.pixels_per_scanline);
         }
-
 
         // TODO
         // read enough data to extract the full set of LRIT headers
         // check for rice and image strucuture headers
-        // set up 
-        
-
-
-
+        // set up
 
         Session {
             last_seq: seq,
             bytes,
             apid,
-            needs_decomp
+            needs_decomp,
         }
     }
 
@@ -382,24 +389,27 @@ impl Session {
             skipped - 1, self.apid, self.last_seq, new_seq);
         }
         self.last_seq = new_seq;
-        if let DecompInfo::Needed(params) = self.needs_decomp {
-            let num_columns = params.pixels_per_scanline as usize;
-            assert!(pdu.data.len() <= num_columns as usize, "session needs rice decomp, but bytes to decomp ({}) is greater than image cols ({})", pdu.data.len() - 2, num_columns);
+        if let DecompInfo::Needed((ref mut params, num_columns)) = self.needs_decomp {
+            // let num_columns = params.pixels_per_scanline as usize;
+            assert!(pdu.data.len() <= num_columns, "session needs rice decomp, but bytes to decomp ({}) is greater than image cols ({})", pdu.data.len() - 2, num_columns);
 
             let mut out_buf = Vec::with_capacity(num_columns as usize);
             out_buf.resize(num_columns as usize, 0);
-            match acres::decompress(&pdu.data, &mut out_buf, params) {
-                Ok(len) => {
-                    assert_eq!(len, num_columns, "Successfully decompressed TP_PDU, but bytes out of decompressor ({}) doesn't match num columns ({})", len, num_columns);
-                    self.bytes.extend(&out_buf[..len]);
-                },
-                Err(rc) => panic!("Failed to decompress with rc {}", rc)
+            // match acres::decompress(&pdu.data, &mut out_buf, params) {
+            match params.decompress(&pdu.data, &mut out_buf) {
+                Ok(buf) => {
+                    assert_eq!(buf.len(), num_columns, "Successfully decompressed TP_PDU, but bytes out of decompressor ({}) doesn't match num columns ({})", buf.len(), num_columns);
+                    self.bytes.extend_from_slice(buf);
+                }
+                Err(rc) => panic!("Failed to decompress with rc {}", rc),
             }
-
-
         } else {
             // sanity check:
-            assert!(pdu.data.len() < 1_000_000, "tp_pdu data length is suspicious {}", pdu.data.len());
+            assert!(
+                pdu.data.len() < 1_000_000,
+                "tp_pdu data length is suspicious {}",
+                pdu.data.len()
+            );
             self.bytes.extend(pdu.data);
         }
     }
@@ -408,16 +418,15 @@ impl Session {
         //let header = crate::lrit::PrimaryHeader::from_data(&self.bytes[10..]);
         //info!("primary header: {:?}", header);
         let headers = read_headers(&self.bytes);
-        let data = self.bytes.split_off(headers.primary.total_header_length as usize);
+        let data = self
+            .bytes
+            .split_off(headers.primary.total_header_length as usize);
         if let Some(_rice) = &headers.rice_compression {
             //let ish = headers.img_strucutre.as_ref().unwrap();
             //info!("{:?}", headers);
             //info!("ish.cols={}, datalen={}", ish.num_columns, data.len());
         }
-        return LRIT {
-            headers,
-            data
-        }
+        return LRIT { headers, data };
         //info!("Headers: {:?}", headers);
 
         //let root = std::path::Path::new("/nas/achin/devel/goes-dht/out_new");
@@ -528,7 +537,6 @@ impl VirtualChannel {
             return lrits; // fill packet
         }
 
-
         while offset < data.len() {
             let mut tp_pdu = TP_PDU::new(vcdu.VCID());
             offset += tp_pdu.process_bytes(&data[offset..]);
@@ -634,7 +642,7 @@ impl Headers {
             header: None,
             timestamp: None,
             text: None,
-            rice_compression: None
+            rice_compression: None,
         }
     }
 }
@@ -806,7 +814,7 @@ pub struct ImageStructureRecord {
 
     pub num_lines: u16,
 
-    pub compression: u8
+    pub compression: u8,
 }
 impl LRITHeader for ImageStructureRecord {
     const TYPE: u8 = 1;
