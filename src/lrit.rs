@@ -142,7 +142,7 @@ impl TP_PDU {
         if self.data_complete() {
             let len = self.data.len();
             // the CRC is over the application data file, and is stored in the last 2 bytes
-            let computed = crate::calc_crc(&self.data[..len - 2]);
+            let computed = crate::crc::calc_crc16(&self.data[..len - 2]);
             let received = (self.data[len - 2] as u16) << 8 | self.data[len - 1] as u16;
             if computed != received {
                 warn!(

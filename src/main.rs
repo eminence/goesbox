@@ -24,7 +24,6 @@ mod lrit;
 use lrit::*;
 
 mod crc;
-use crc::calc_crc;
 
 pub mod handlers;
 

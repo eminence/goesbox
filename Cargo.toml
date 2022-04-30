@@ -20,6 +20,7 @@ zip = "0.5.2"
 image = "0.22"
 acres = {git = "https://github.com/agrif/acres"}
 lru-cache = "0.1.2"
+crc-any = "2.4.2"
 
 
 [profile.release]
