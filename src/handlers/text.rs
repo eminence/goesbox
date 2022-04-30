@@ -4,7 +4,7 @@ use log::{info, warn};
 
 use crate::lrit::LRIT;
 
-use super::Handler;
+use super::{Handler, HandlerError};
 
 pub struct TextHandler {
     output_root: PathBuf,
@@ -19,9 +19,9 @@ impl TextHandler {
 }
 
 impl Handler for TextHandler {
-    fn handle(&mut self, lrit: &LRIT) {
+    fn handle(&mut self, lrit: &LRIT) -> Result<(), HandlerError> {
         if lrit.headers.primary.filetype_code != 2 {
-            return;
+            return Err(HandlerError::Skipped);
         }
         // before trying to print this message, see if it's compressed by looking
 
@@ -33,23 +33,15 @@ impl Handler for TextHandler {
 
         if compressed {
             let mut cur = std::io::Cursor::new(&lrit.data);
-            let result = zip::read::ZipArchive::new(&mut cur);
-            match result {
-                Ok(mut archive) => {
-                    //info!("zip read: Ok(archive) {}", archive.len());
-                    for idx in 0..archive.len() {
-                        if let Ok(mut file) = archive.by_index(idx) {
-                            //info!("Zip archive file {}", file.name());
-                            if let Ok(mut output_file) =
-                                std::fs::File::create(self.output_root.join(file.sanitized_name()))
-                            {
-                                std::io::copy(&mut file, &mut output_file);
-                            }
-                        }
-                    }
-                }
-                Err(e) => {
-                    warn!("zip read: err {}", e);
+            let mut archive = zip::read::ZipArchive::new(&mut cur)?;
+
+            //info!("zip read: Ok(archive) {}", archive.len());
+            for idx in 0..archive.len() {
+                if let Ok(mut file) = archive.by_index(idx) {
+                    //info!("Zip archive file {}", file.name());
+                    let mut output_file =
+                        std::fs::File::create(self.output_root.join(file.sanitized_name()))?;
+                    std::io::copy(&mut file, &mut output_file)?;
                 }
             }
         } else {
@@ -59,7 +51,7 @@ impl Handler for TextHandler {
                 if let Ok(mut output_file) =
                     std::fs::File::create(self.output_root.join(&annotation.text))
                 {
-                    output_file.write_all(&lrit.data);
+                    output_file.write_all(&lrit.data)?;
                 }
             }
             //info!("uncompressed string data: {}", s);
@@ -68,5 +60,6 @@ impl Handler for TextHandler {
         if let Some(ann) = &lrit.headers.annotation {
             info!("Wrote {}", ann.text);
         }
+        Ok(())
     }
 }

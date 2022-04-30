@@ -4,7 +4,7 @@ use log::info;
 
 use crate::lrit::LRIT;
 
-use super::Handler;
+use super::{Handler, HandlerError};
 
 pub struct ImageHandler {
     output_root: PathBuf,
@@ -28,9 +28,9 @@ impl ImageHandler {
 }
 
 impl Handler for ImageHandler {
-    fn handle(&mut self, lrit: &LRIT) {
+    fn handle(&mut self, lrit: &LRIT) -> Result<(), HandlerError> {
         if lrit.headers.primary.filetype_code != 0 {
-            return;
+            return Err(HandlerError::Skipped);
         }
 
         // these headers are mandatory for image data:
@@ -73,14 +73,13 @@ impl Handler for ImageHandler {
             if let Some(noaa) = &lrit.headers.noaa {
                 if noaa.noaa_compression == 5 {
                     // gif image can be written directly to disk
-                    if let Ok(mut file) = std::fs::File::create(
+                    let mut file = std::fs::File::create(
                         self.output_root
                             .join(&annotation.text)
                             .with_extension("gif"),
-                    ) {
-                        file.write_all(&lrit.data).expect("write_all");
-                        return;
-                    }
+                    )?;
+                    file.write_all(&lrit.data)?;
+                    return Ok(());
                 }
             }
 
@@ -103,9 +102,9 @@ impl Handler for ImageHandler {
                 .with_extension("jpg");
             info!("{}", out_name.display());
 
-            img.save(out_name);
+            img.save(out_name)?;
 
-            return;
+            return Ok(());
         }
 
         let seg = lrit
@@ -119,7 +118,7 @@ impl Handler for ImageHandler {
             seg_vec.push(lrit.clone());
 
             if seg_vec.len() == seg.max_segment as usize {
-                self.write_image_from_segments(seg_vec);
+                self.write_image_from_segments(seg_vec)?;
             } else {
                 // put the list back in the LRU cache
                 self.segments.insert(seg.image_id, seg_vec);
@@ -128,13 +127,15 @@ impl Handler for ImageHandler {
             // if adding this entry would evict an old entry... we don't really care
             self.segments.insert(seg.image_id, vec![lrit.clone()]);
         }
+
+        Ok(())
     }
 }
 
 impl ImageHandler {
-    fn write_image_from_segments(&self, mut segments: Vec<LRIT>) {
+    fn write_image_from_segments(&self, mut segments: Vec<LRIT>) -> Result<(), HandlerError> {
         if segments.len() == 0 {
-            return;
+            return Ok(());
         }
 
         // these 3 headers are required for image data, but might be missing nonetheless
@@ -231,7 +232,7 @@ impl ImageHandler {
                     seg.max_segment,
                     out_name.display()
                 );
-                img.save(out_name);
+                img.save(out_name)?;
             }
             None => {
                 /*
@@ -244,5 +245,6 @@ impl ImageHandler {
                 );
             }
         }
+        Ok(())
     }
 }

@@ -1,5 +1,6 @@
 #![allow(unused_imports)]
 
+use log::warn;
 use nanomsg::{Protocol, Socket};
 
 use std::io;
@@ -134,8 +135,14 @@ fn main() -> Result<(), io::Error> {
                 let vcdu = VCDU::new(&data[..892]);
 
                 for lrit in app.process(vcdu) {
-                    for mut handler in &mut handlers {
-                        handler.handle(&lrit)
+                    for handler in &mut handlers {
+                        match handler.handle(&lrit) {
+                            Ok(()) => {},
+                            Err(handlers::HandlerError::Skipped) => {},
+                            Err(e) => {
+                                warn!("Handler failed: {:?}", e);
+                            }
+                        }
                     }
                     let code = lrit.headers.primary.filetype_code ;
                     if code != 0 && code != 2 && code != 130 {
