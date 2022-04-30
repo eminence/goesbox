@@ -1,4 +1,3 @@
-use crate::handlers::ImageHandler;
 use byteorder::{NetworkEndian, ReadBytesExt};
 use log::{info, warn};
 use std::any::Any;
