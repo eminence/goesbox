@@ -1,9 +1,11 @@
 use crate::lrit::LRIT;
 
+mod dcs;
 mod debug;
 mod image;
 mod text;
 
+pub use self::dcs::*;
 pub use self::debug::*;
 pub use self::image::*;
 pub use self::text::*;
@@ -18,6 +20,13 @@ pub enum HandlerError {
     Io(std::io::Error),
     /// A ZIP error
     Zip(zip::result::ZipError),
+    /// A handler is missing a header
+    ///
+    /// This is unexpected, and is either a bug in this code or a corrupt packet.
+    MissingHeader(&'static str),
+
+    /// Some parsing error
+    Parse(&'static str),
 }
 
 impl From<std::io::Error> for HandlerError {

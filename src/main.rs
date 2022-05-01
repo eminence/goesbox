@@ -113,6 +113,7 @@ fn main() -> Result<(), io::Error> {
     let mut handlers: Vec<Box<handlers::Handler>> = Vec::new();
     handlers.push(Box::new(handlers::TextHandler::new()));
     handlers.push(Box::new(handlers::ImageHandler::new()));
+    handlers.push(Box::new(handlers::DcsHandler::new()));
     handlers.push(Box::new(handlers::DebugHandler::new()));
 
     loop {
