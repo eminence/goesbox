@@ -127,10 +127,10 @@ impl log::Log for AppLogger {
     }
 
     fn log(&self, record: &log::Record) {
-        if record.level() >= log::Level::Debug {
+        if !record.target().starts_with("goes_dht") && record.level() >= log::Level::Debug {
             return;
         }
-        self.app_channel.send(format!(
+        let _ = self.app_channel.send(format!(
             "{} {} {}",
             record.target(),
             record.level(),
