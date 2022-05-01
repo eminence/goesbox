@@ -295,7 +295,7 @@ impl TP_PDU {
 
 enum DecompInfo {
     NoneNeeded,
-    Needed((acres::sz::Parameters, usize)),
+    Needed(acres::sz::Parameters),
 }
 
 /// A utility struct used to build up session layer data (an LRIT file)
@@ -315,14 +315,12 @@ struct Session {
 fn check_headers_for_rice_compression(bytes: &[u8]) -> DecompInfo {
     let headers = read_headers(bytes);
     if let (Some(ref ish), Some(ref rice)) = (headers.img_strucutre, headers.rice_compression) {
-        return DecompInfo::Needed((
+        return DecompInfo::Needed(
             acres::sz::Parameters::new(
                 acres::sz::Options::from_bits_truncate(rice.flags as u32),
                 ish.bits_per_pixel as usize,
                 rice.pixels_per_block as usize,
                 ish.num_columns as usize,
-            ),
-            ish.num_columns as usize,
         ));
     }
     DecompInfo::NoneNeeded
@@ -428,12 +426,11 @@ impl Session {
             skipped - 1, self.apid, self.last_seq, new_seq);
         }
         self.last_seq = new_seq;
-        if let DecompInfo::Needed((ref mut params, num_columns)) = self.needs_decomp {
-            // let num_columns = params.pixels_per_scanline as usize;
+        if let DecompInfo::Needed(ref mut params) = self.needs_decomp {
+            let num_columns = params.pixels_per_scanline() as usize;
             assert!(pdu.data.len() <= num_columns, "session needs rice decomp, but bytes to decomp ({}) is greater than image cols ({})", pdu.data.len() - 2, num_columns);
 
             let mut out_buf = Vec::with_capacity(num_columns as usize);
-            out_buf.resize(num_columns as usize, 0);
             // match acres::decompress(&pdu.data, &mut out_buf, params) {
             match params.decompress(&pdu.data, &mut out_buf) {
                 Ok(buf) => {
