@@ -45,7 +45,7 @@ impl Debug for LRIT {
 ///
 /// The 6 byte header has the following fields:
 ///
-/// * 2 bits for a version field
+/// * 2 bits for a version field (should always be 1)
 /// * 14 bits for a VCDU-ID field (upper 8 bits is the SDID, lower 6 bits is the VCID)
 /// * 24 bits for a VCDU counter
 /// * 8 bits for a signaling field.  The first bit is the replay flag, and lower 7 bits are not used
@@ -54,6 +54,8 @@ impl Debug for LRIT {
 ///      0123456701234567
 ///     +------------------
 ///     |..ooooooooIIIIII
+///
+/// Ref: 3_LRIT_Receiver-specs.pdf page 9
 pub struct VCDU<'a> {
     bytes: &'a [u8],
 }
@@ -71,15 +73,24 @@ impl<'a> VCDU<'a> {
     }
 
     /// Spacecraft ID
+    ///
+    /// This represents the spacecraft which sent this message
     pub fn SCID(&self) -> u8 {
         (self.bytes[0] & 0x3f) << 2 | (self.bytes[1] & 0xc0) >> 6
     }
 
+    /// Virtual Channel ID
+    ///
+    /// This is a 6-bit field, so the max ID is 63 (which represents a fill packet)
     pub fn VCID(&self) -> u8 {
         self.bytes[1] & 0x3f
     }
 
     /// A sequential counter of VCDUs on each virtual channel
+    ///
+    /// This counter is specified to this VCDU, and can be used to detected dropped packets
+    ///
+    /// This is a 24-bit field, so this counter is modulo 1<<24
     pub fn counter(&self) -> u32 {
         ((self.bytes[2] as u32) << 16) | ((self.bytes[3] as u32) << 8) | self.bytes[4] as u32
     }
@@ -88,6 +99,7 @@ impl<'a> VCDU<'a> {
     //    return &data_[6];
     //}
 
+    /// The length of the data in bytes
     pub fn len(&self) -> usize {
         self.bytes.len() - 6
     }
@@ -96,22 +108,22 @@ impl<'a> VCDU<'a> {
         &self.bytes[6..]
     }
 
+    /// Fill packets are sent on VCID 63
     pub fn is_fill(&self) -> bool {
         self.VCID() == 63
     }
 }
 
-/// Multiplexing Protocol Data Unit
+/// Ths Transport Service Protocol Data Unit
 ///
-/// This structure is 886 bytes long.  It has a 2 byte header, followed by a 884 byte payload.
+/// This unit stores up to 8190 bytes for a specific APID (application process identifier)
 ///
-/// The "First Header Pointer" field in the header points to within the payload section at the
-/// start of a M_SDU structure.  There may be 0 or more M_SDU structures within the payload
-struct MPDU {}
-
+/// Ref: 4_LRIT_Transmitter-specs.pdf Page 16
 struct TP_PDU {
-    header: Vec<u8>, // fixed length 6
-    data: Vec<u8>,   // legth max 8190 plus 2 bytes for CRC
+    /// The header contains 6 bytes
+    header: Vec<u8>,
+    /// The data field is max 8190 bytes, plus 2 additional bytes for CRC
+    data: Vec<u8>,
     vcid: u8,
 }
 
@@ -158,6 +170,10 @@ impl TP_PDU {
         }
     }
 
+    /// The version of the TP_PDU
+    ///
+    /// The first 3 bits of the header, this should also be 0
+    ///
     pub fn version(&self) -> Option<u8> {
         if self.header.len() > 0 {
             let ver = (self.header[0] >> 5) & 0x7;
@@ -168,6 +184,9 @@ impl TP_PDU {
         }
     }
 
+    /// Packet type
+    ///
+    /// This should always be 0
     pub fn packet_type(&self) -> Option<bool> {
         if self.header.len() > 0 {
             Some((self.header[0] & 0b00010000) > 0)
@@ -184,6 +203,10 @@ impl TP_PDU {
         }
     }
 
+    /// The Application Process Identifier
+    ///
+    /// APIDs between 0 and 191 are GOES LRIT application data.
+    /// APID 2047 is a fill packet which contains no context
     pub fn APID(&self) -> Option<u16> {
         if self.header.len() >= 2 {
             Some(((self.header[0] & 0b111) as u16) << 8 | self.header[1] as u16)
@@ -192,6 +215,14 @@ impl TP_PDU {
         }
     }
 
+    /// Sequence flags
+    ///
+    /// This flag has the following values:
+    ///
+    /// * 3: The user data contains one user data file entirely
+    /// * 1: The user data contains the first segment of one user file extending through subsequence packets
+    /// * 0: THe user data contains a continuation segment of one user data file, still extending through subsequence packets
+    /// * 2: The user data contains the last segment of one user data file beginning in an earlier packet
     pub fn flags(&self) -> Option<u8> {
         if self.header.len() >= 4 {
             Some((self.header[2] & 0xc0) >> 6)
@@ -253,7 +284,6 @@ impl TP_PDU {
             let needed_bytes = packet_len as usize - self.data.len();
             assert!(needed_bytes > 0);
             let a = std::cmp::min(needed_bytes, bytes.len() - bytes_used);
-            assert!(a >= 0);
             self.data
                 .extend_from_slice(&bytes[bytes_used..bytes_used + a]);
             bytes_used + a // how many total bytes we used
@@ -268,8 +298,14 @@ enum DecompInfo {
     Needed((acres::sz::Parameters, usize)),
 }
 
+/// A utility struct used to build up session layer data (an LRIT file)
+///
+/// An entire LRIT file will be transmitted via 1 or more TP_PDUs.  This struct
+/// will collect them as they arrive, and produce a single LRIT file when complete.
 struct Session {
+    /// Bytes received so far
     bytes: Vec<u8>,
+    /// The most recent sequence number received (from the last TP_PDU)
     last_seq: u16,
     apid: u16,
     needs_decomp: DecompInfo,
@@ -293,6 +329,7 @@ fn check_headers_for_rice_compression(bytes: &[u8]) -> DecompInfo {
 }
 
 impl Session {
+    /// Create a new session from the first TP_PDU of some session layer data
     pub fn new_from_pdu(pdu: TP_PDU) -> Session {
         assert!(pdu.header_complete());
         assert!(pdu.data_complete());
@@ -368,7 +405,7 @@ impl Session {
     pub fn append(&mut self, mut pdu: TP_PDU, stats: &mut crate::Stats) {
         assert!(pdu.header_complete());
         assert!(pdu.data_complete());
-        if (!pdu.is_crc_ok()) {
+        if !pdu.is_crc_ok() {
             warn!(
                 "Refusing to append data that failed CRC (apid {})",
                 pdu.APID().unwrap()
@@ -381,6 +418,9 @@ impl Session {
         let new_seq = pdu
             .sequence_count()
             .expect("pdu sequence should never be None");
+
+        // Note: 4_LRIT_Transmitter-specs.pdf section 6.2.1 says that this sequence number is 14 bit modulo 16394
+        //       but that is almost certainly a typo
         if diff_with_wrap(self.last_seq as u32, new_seq as u32, 1 << 14) > 1 {
             //if new_seq != self.last_seq + 1 {
             let skipped = new_seq as isize - self.last_seq as isize;
@@ -447,7 +487,13 @@ impl Session {
     }
 }
 
+/// A structure that parses LRIT data out of one specific virtual channel
+///
+/// This structure doesn't have a direct mapping to any of the offical LRIT structures.
+///
+/// Different types of data are transmitted on each virtual channel.
 pub struct VirtualChannel {
+    /// The virtual channel ID
     id: u8,
 
     /// Holds the current incomplete TP_PDU that we're working on (if any)
@@ -469,7 +515,7 @@ impl VirtualChannel {
         }
     }
 
-    /// Extract TP_PUDs from a VCDU
+    /// Extract TP_PUDs from a VCDU, returning any completed LRIT files
     pub fn process_vcdu(&mut self, vcdu: VCDU, stats: &mut crate::Stats) -> Vec<LRIT> {
         let data = vcdu.data();
         assert_eq!(data.len(), 886);
@@ -478,7 +524,7 @@ impl VirtualChannel {
         if diff_with_wrap(self.last_counter, vcdu.counter(), 1 << 24) > 1 {
             // we're missing some packets -- if we've got an incomplete TP_PDU,
             // we need to drop it (because we can't know if the missing packet(s)
-            // started a new one
+            // started a new one or finished the current one.
             self.current_tp_pdu.take();
             info!("VC {} Dropping incomplete TP_PDU", self.id);
         }
@@ -487,6 +533,9 @@ impl VirtualChannel {
 
         let first_header = {
             // read off the first 2 bytes and extract a first header pointer
+
+            // Ref: 3_LRIT_Receiver-specs.pdf Figure 5 M_PDU Structure
+            // Ref: 5_LRIT_Mission-data.pdf Page 3
             let spare = (data[0] & 0b11111000) >> 3;
             assert_eq!(spare, 0);
 
@@ -500,6 +549,7 @@ impl VirtualChannel {
         // up-to first_header to complete it
         if let Some(mut tp_pdu) = self.current_tp_pdu.take() {
             assert!(!tp_pdu.data_complete());
+
             if let Some(total_len) = tp_pdu.packet_length() {
                 let bytes_needed = total_len as usize - tp_pdu.data.len();
                 if first_header != 2047 && first_header < bytes_needed {
@@ -512,13 +562,27 @@ impl VirtualChannel {
                 }
             }
 
-            // we have an unfinished tp_pdu,
+            // we have an unfinished tp_pdu, which we may or may not be able to complete with this new data
+            // (however, we do expect to always be able to complete the 6 byte header)
             offset += tp_pdu.process_bytes(&data[offset..]);
             assert!(tp_pdu.header_complete());
 
             if tp_pdu.data_complete() {
                 lrits.extend(self.process(tp_pdu, stats));
-            //assert_eq!(offset, first_header, "offset {} doesn't match first_header {}", offset, first_header);
+
+                // at this point, if we have another packet, we should expect it to start at our current offset.
+                // remember "first_header" is relative to the start of the packet zone, but "offset" is relative to the start of
+                // entire data (which includes a 2 byte header).
+                if first_header != 2047 {
+                    assert_eq!(
+                        offset - 2,
+                        first_header,
+                        "offset={} first_header={}",
+                        offset,
+                        first_header
+                    );
+                }
+                // assert!(offset - 2 <= first_header, "offset {} is past first_header {}", offset - 2, first_header);
             } else {
                 // if not complete, then we should have no more bytes to read
                 assert_eq!(offset, data.len());
@@ -526,6 +590,8 @@ impl VirtualChannel {
                 return lrits;
             }
         } else {
+            // the "first_header" is the offset to the first TP_PDU that contains a header.  Any data before this
+            // is going to be from some previously started TP_PDU
             offset = 2 + first_header;
         }
 
@@ -539,6 +605,8 @@ impl VirtualChannel {
         while offset < data.len() {
             let mut tp_pdu = TP_PDU::new(vcdu.VCID());
             offset += tp_pdu.process_bytes(&data[offset..]);
+            // note that while "first_header" is documented to point to the first TP_PDU with a header, it doesn't
+            // mean that the TP_PDU will have a complete header!
 
             if tp_pdu.header_complete() && tp_pdu.data_complete() {
                 lrits.extend(self.process(tp_pdu, stats));
@@ -552,6 +620,10 @@ impl VirtualChannel {
         lrits
     }
 
+    /// Process a completed TP_PDU
+    ///
+    /// If this was the last TP_PDU in an LRIT file, a new LRIT file can be returned.
+    /// Else, this TP_PDU is added
     fn process(&mut self, tp_pdu: TP_PDU, stats: &mut crate::Stats) -> Option<LRIT> {
         let apid = tp_pdu.APID().unwrap();
         if apid == 2047 {
@@ -566,18 +638,17 @@ impl VirtualChannel {
             // x == 1 means this is the first segment of a new data file, and there will be
             // more to come.
             // x == 3 means this is the first and only segment of a new data file
+            // (Ref: 4_LRIT_Transmitter-specs.pdf page 20)
 
             // see if there's a previous record of this apid in our map.  If so, it won't be valid.
-            if let Some(pdu) = self.apid_map.remove(&apid) {
-                //app.info(format!("XXX Dropping old apid data {}", apid));
+            if let Some(_pdu) = self.apid_map.remove(&apid) {
                 warn!("XXX Dropping old apid data {}", apid);
             }
 
             let session = Session::new_from_pdu(tp_pdu);
             if flags == 1 {
+                // we'll expect to receive more data with this same APID
                 self.apid_map.insert(apid, session);
-            //app.info(format!("Starting new session apid={}", apid));
-            //info!("Starting new session apid={}", apid);
             } else {
                 //info!("Starting (and finishing) apid={} (total data len {})", apid, session.bytes.len());
                 let lrit = session.finish();
@@ -650,6 +721,11 @@ pub trait LRITHeader: std::fmt::Debug {
     const TYPE: u8;
 }
 
+/// Attempts to read LRIT headers
+///
+/// Ref: 3_LRIT_Receiver-specs.pdf
+///
+/// Ref: 5_LRIT_Mission-data.pdf
 pub fn read_headers(data: &[u8]) -> Headers {
     // the general approach is to read 1 byte, which indicates what type of header we have, and
     // then read the full header once we know what it is and how long it is.
@@ -734,7 +810,6 @@ pub fn read_headers(data: &[u8]) -> Headers {
             }
             x => {
                 panic!("Found unexpected header type {}", x);
-                break;
             }
         }
     }
@@ -758,6 +833,8 @@ pub struct PrimaryHeader {
     /// Total header length
     ///
     /// Total length of all header records (including this one), in bytes
+    ///
+    /// Since the primary header itself is 16 bytes, if total_header_length == 16, then there are no other headers
     pub total_header_length: u32,
 
     /// Data field length
@@ -908,6 +985,11 @@ impl ImageNavigationRecord {
     }
 }
 
+/// This header specifies an alphanumeric annotation for the fil
+///
+/// Mandatory for Image Data, Text, Meteorologic Data, and GTS Messages (4_LRIT_Transmitter-specs.pdf Table 16)
+///
+/// Source: 4_LRIT_Transmitter-specs.pdf Table 10 (page 13)
 #[derive(Debug, Clone)]
 pub struct AnnotationRecord {
     /// Header type, must always be 4

@@ -1,3 +1,7 @@
+//! Handler of Image products
+//!
+//! Image products are identified by having a filetype_code of 0 in the primary header.
+//! (Source: 4_LRIT_Transmitter-specs.pdf Table 3: LRIT File Types)
 use std::{collections::HashMap, io::Write, path::PathBuf};
 
 use log::info;

@@ -151,6 +151,7 @@ impl App {
         }
     }
 
+    /// Process an incoming VCDU packet, and return any completed LRIT files (if any)
     pub fn process(&mut self, vcdu: crate::lrit::VCDU) -> Vec<LRIT> {
         let id = vcdu.VCID();
         self.record(Stat::Packet);
@@ -158,6 +159,7 @@ impl App {
         if vcdu.is_fill() {
             return Vec::new();
         }
+        // Each VCDU needs to be processed by the corresponding VirtualChannel
         let vc = self
             .vcs
             .entry(id)
