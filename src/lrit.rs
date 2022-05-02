@@ -295,7 +295,7 @@ impl TP_PDU {
 
 enum DecompInfo {
     NoneNeeded,
-    Needed(acres::sz::Parameters),
+    Needed(acres::sz::Sz),
 }
 
 /// A utility struct used to build up session layer data (an LRIT file)
@@ -316,7 +316,7 @@ fn check_headers_for_rice_compression(bytes: &[u8]) -> DecompInfo {
     let headers = read_headers(bytes);
     if let (Some(ref ish), Some(ref rice)) = (headers.img_strucutre, headers.rice_compression) {
         return DecompInfo::Needed(
-            acres::sz::Parameters::new(
+            acres::sz::Sz::new(
                 acres::sz::Options::from_bits_truncate(rice.flags as u32),
                 ish.bits_per_pixel as usize,
                 rice.pixels_per_block as usize,
