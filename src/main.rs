@@ -38,8 +38,13 @@ pub fn set_panic_handler() {
             .truncate(false)
             .open("panic.log")
         {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+
             let _ = writeln!(file, "======");
-            let _ = writeln!(file, "Panic!");
+            let _ = writeln!(file, "Panic! {}", now);
             let payload = info.payload();
             if let Some(m) = payload.downcast_ref::<&str>() {
                 let _ = writeln!(file, "{}", m);
