@@ -282,10 +282,10 @@ struct DcsBlock {
     corrected_addr: u32,
 
     /// The time when the signal energy was first detected
-    carrier_start: [u8; 7],
+    carrier_start: chrono::DateTime<Utc>,
 
     /// The time when the signal energy was no logner detectable
-    carrier_end: [u8; 7],
+    carrier_end: chrono::DateTime<Utc>,
 
     /// Received message Signal strength in dBm
     signal_strength: f32,
@@ -382,9 +382,49 @@ impl DcsBlock {
             let mut carrier_start_buf = [0; 7];
             cur.read_exact(&mut carrier_start_buf)?;
 
+            // a date stored in BCD format
+            // HRIT_DCS_File_Format_Rev1.pdf
+
+            // last 2 digits of the year (like 22 for 2022)
+            let year = 10 * (carrier_start_buf[6] >> 4) + (carrier_start_buf[6] & 0xF);
+            // day of the year
+            let day = 100 * (carrier_start_buf[5] as u32 >> 4)
+                + 10 * (carrier_start_buf[5] as u32 & 0xF)
+                + (carrier_start_buf[4] as u32 >> 4);
+
+            let hour = 10 * (carrier_start_buf[4] & 0xF) + (carrier_start_buf[3] >> 4);
+            let minute = 10 * (carrier_start_buf[3] & 0xF) + (carrier_start_buf[2] >> 4);
+            let second = 10 * (carrier_start_buf[2] & 0xF) + (carrier_start_buf[1] >> 4);
+            let millis = 100 * (carrier_start_buf[1] as u32 & 0xF)
+                + 10 * (carrier_start_buf[0] as u32 & 0xF)
+                + (carrier_start_buf[0] as u32 >> 4);
+
+            let start_date = chrono::NaiveDate::from_yo(2000 + year as i32, day);
+            let start =
+                start_date.and_hms_milli(hour as u32, minute as u32, second as u32, millis as u32);
+            let start = chrono::DateTime::<Utc>::from_utc(start, chrono::Utc);
+
             // carrier end
             let mut carrier_end_buf = [0; 7];
             cur.read_exact(&mut carrier_end_buf)?;
+
+            let year = 10 * (carrier_end_buf[6] >> 4) + (carrier_end_buf[6] & 0xF);
+            // day of the year
+            let day = 100 * (carrier_end_buf[5] as u32 >> 4)
+                + 10 * (carrier_end_buf[5] as u32 & 0xF)
+                + (carrier_end_buf[4] as u32 >> 4);
+
+            let hour = 10 * (carrier_end_buf[4] & 0xF) + (carrier_end_buf[3] >> 4);
+            let minute = 10 * (carrier_end_buf[3] & 0xF) + (carrier_end_buf[2] >> 4);
+            let second = 10 * (carrier_end_buf[2] & 0xF) + (carrier_end_buf[1] >> 4);
+            let millis = 100 * (carrier_end_buf[1] as u32 & 0xF)
+                + 10 * (carrier_end_buf[0] as u32 & 0xF)
+                + (carrier_end_buf[0] as u32 >> 4);
+
+            let end_date = chrono::NaiveDate::from_yo(2000 + year as i32, day);
+            let end =
+                end_date.and_hms_milli(hour as u32, minute as u32, second as u32, millis as u32);
+            let end = chrono::DateTime::<Utc>::from_utc(end, chrono::Utc);
 
             // signal strength (10 bits)
             let signal_strength_10x = cur.read_u16::<LittleEndian>()?;
@@ -484,8 +524,8 @@ impl DcsBlock {
                 unexpected_message,
                 wrong_channel,
                 corrected_addr,
-                carrier_start: carrier_start_buf,
-                carrier_end: carrier_end_buf,
+                carrier_start: start,
+                carrier_end: end,
                 signal_strength,
                 freq_offset,
                 phase_noise,
