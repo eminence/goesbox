@@ -1,20 +1,29 @@
 //! Parser for HRIT DCS ("Data Collection System") files
 //!
 //! Reference: HRIT_DCS_File_Format_Rev1.pdf
-use std::io::{Read, Seek, SeekFrom};
+use std::{
+    fs::File,
+    io::{Read, Seek, SeekFrom, Write},
+    path::PathBuf,
+};
 
 use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
+use chrono::Utc;
 use log::{debug, info, warn};
 
 use crate::{crc, handlers::HandlerError};
 
 use super::Handler;
 
-pub struct DcsHandler {}
+pub struct DcsHandler {
+    output_root: PathBuf,
+}
 
 impl DcsHandler {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            output_root: PathBuf::from("/tank/achin/tmp/goes_out2"),
+        }
     }
 }
 
@@ -27,7 +36,7 @@ impl Handler for DcsHandler {
         let noaa = if let Some(noaa) = &lrit.headers.noaa {
             noaa
         } else {
-            warn!("Missing NOAA header from DSC packet");
+            warn!("Missing NOAA header from DCS packet");
             return Err(HandlerError::MissingHeader("NOAA"));
         };
 
@@ -35,7 +44,14 @@ impl Handler for DcsHandler {
             return Err(HandlerError::Skipped);
         }
 
-        info!("DSC packet has {} bytes of data", lrit.data.len());
+        let annotation = if let Some(ann) = &lrit.headers.annotation {
+            ann
+        } else {
+            warn!("Missing annotation from DCS packet");
+            return Err(HandlerError::MissingHeader("annotation"));
+        };
+
+        info!("DCS packet has {} bytes of data", lrit.data.len());
 
         let header = DcsHeader::parse(&lrit.data[..])?;
         if header.payload_type != "DCSH" {
@@ -48,8 +64,45 @@ impl Handler for DcsHandler {
 
         let blocks = DcsBlock::parse(&lrit.data[64..])?;
         info!("Found {} blocks", blocks.len());
-        for block in blocks {
-            // info!("{:?}", block);
+
+        let base_name = annotation.text.trim_end_matches(".lrit");
+
+        // TEMP DELETE ME (dump raw LRIT file for debugging)
+        let mut t = File::create(self.output_root.join(base_name).with_extension("raw_lrit"))?;
+        t.write_all(&lrit.data)?;
+        drop(t);
+
+        for (idx, block) in blocks.into_iter().enumerate() {
+            let pseudo_binary: Vec<_> = block.data.into_iter().skip(1).map(|x| x & 0x7f).collect();
+
+            let mut f = std::fs::File::create(self.output_root.join(format!(
+                "{base_name}-{:0>8X}-{idx:03}.dcs",
+                block.corrected_addr
+            )))?;
+            writeln!(f, "{:#?}\n\n", header)?;
+            writeln!(f, "Baud: {:?}", block.baud_rate)?;
+            writeln!(f, "platform: {:?}", block.platform)?;
+            writeln!(f, "Parity errors: {}", block.parity_errors)?;
+            writeln!(f, "Missing EOT: {}", block.missing_eot)?;
+            writeln!(f, "Addr corrected: {}", block.addr_corrected)?;
+            writeln!(f, "Bad addr: {}", block.bad_addr)?;
+            writeln!(f, "Invalid addr: {}", block.invalid_addr)?;
+            writeln!(f, "Incomplete PDT: {}", block.incomplete_pdt)?;
+            writeln!(f, "Timing error: {}", block.timing_error)?;
+            writeln!(f, "Unexpected message: {}", block.unexpected_message)?;
+            writeln!(f, "Wrong channel: {}", block.wrong_channel)?;
+            writeln!(f, "Corrected addr: {:0>8X}", block.corrected_addr)?;
+            writeln!(f, "Carrier Start: {:?}", block.carrier_start)?;
+            writeln!(f, "Carrier End: {:?}", block.carrier_end)?;
+            writeln!(f, "Signal strength: {} dBm EIRP", block.signal_strength)?;
+            writeln!(f, "Freq offset: {}Hz", block.freq_offset)?;
+            writeln!(f, "Phase noise: {}° RMS", block.phase_noise)?;
+            writeln!(f, "Good phase: {}", block.good_phase)?;
+            writeln!(f, "Space platform: {:?}", block.space_platform)?;
+            writeln!(f, "Channel: {}", block.channel_number)?;
+            writeln!(f, "Source platform: {:?}", block.source_platform)?;
+
+            f.write_all(&pseudo_binary)?;
         }
 
         Ok(())
@@ -278,7 +331,7 @@ impl DcsBlock {
                 // Since we've already read 3 bytes (1 for ID, 2 for len), the total bytes to skip os the block_len - 3
                 // TODO handle block_id 2 (which is fully described in HRIT_DCS_File_Format_Rev1.pdf)
                 warn!(
-                    "Skipping unknown DSC block id {}, skipping {} bytes",
+                    "Skipping unknown DCS block id {}, skipping {} bytes",
                     block_id,
                     block_len - 3
                 );
@@ -340,7 +393,12 @@ impl DcsBlock {
 
             // freq offset (14 bite)
             let freq_offset_10x = cur.read_i16::<LittleEndian>()?;
-            let freq_offset = (freq_offset_10x & 0x3fff) as f32 / 10.0;
+            let freq_offset = if freq_offset_10x > 0x1fff {
+                // two's complement
+                (freq_offset_10x - 0x4000) as f32 / 10.0
+            } else {
+                freq_offset_10x as f32 / 10.0
+            };
 
             // phase noise (12 bits)
             let phase_noise_100x = cur.read_u16::<LittleEndian>()?;
