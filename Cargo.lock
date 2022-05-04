@@ -320,7 +320,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "goes-dht"
+name = "goesbox"
 version = "0.1.0"
 dependencies = [
  "acres",
