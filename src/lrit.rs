@@ -1,10 +1,10 @@
 use byteorder::{NetworkEndian, ReadBytesExt};
 use log::{info, warn};
-use std::any::Any;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::io::{Read, Write};
-use std::ops::Deref;
+
+use crate::crc;
 
 // M_SDU -- Multiplexing Service Data Unit
 // VCLC -- Virtual Channel Link Control
@@ -154,7 +154,7 @@ impl TP_PDU {
         if self.data_complete() {
             let len = self.data.len();
             // the CRC is over the application data file, and is stored in the last 2 bytes
-            let computed = crate::crc::calc_crc16(&self.data[..len - 2]);
+            let computed = crc::calc_crc16(&self.data[..len - 2]);
             let received = (self.data[len - 2] as u16) << 8 | self.data[len - 1] as u16;
             if computed != received {
                 warn!(
@@ -315,12 +315,11 @@ struct Session {
 fn check_headers_for_rice_compression(bytes: &[u8]) -> DecompInfo {
     let headers = read_headers(bytes);
     if let (Some(ref ish), Some(ref rice)) = (headers.img_strucutre, headers.rice_compression) {
-        return DecompInfo::Needed(
-            acres::sz::Sz::new(
-                acres::sz::Options::from_bits_truncate(rice.flags as u32),
-                ish.bits_per_pixel as usize,
-                rice.pixels_per_block as usize,
-                ish.num_columns as usize,
+        return DecompInfo::Needed(acres::sz::Sz::new(
+            acres::sz::Options::from_bits_truncate(rice.flags as u32),
+            ish.bits_per_pixel as usize,
+            rice.pixels_per_block as usize,
+            ish.num_columns as usize,
         ));
     }
     DecompInfo::NoneNeeded
@@ -400,7 +399,7 @@ impl Session {
         }
     }
 
-    pub fn append(&mut self, mut pdu: TP_PDU, stats: &mut crate::Stats) {
+    pub fn append(&mut self, mut pdu: TP_PDU, stats: &crate::stats::Stats) {
         assert!(pdu.header_complete());
         assert!(pdu.data_complete());
         if !pdu.is_crc_ok() {
@@ -513,9 +512,10 @@ impl VirtualChannel {
     }
 
     /// Extract TP_PUDs from a VCDU, returning any completed LRIT files
-    pub fn process_vcdu(&mut self, vcdu: VCDU, stats: &mut crate::Stats) -> Vec<LRIT> {
+    pub fn process_vcdu(&mut self, vcdu: VCDU, stats: &mut crate::stats::Stats) -> Vec<LRIT> {
         let data = vcdu.data();
         assert_eq!(data.len(), 886);
+        assert_eq!(vcdu.VCID(), self.id);
 
         // check this vcdu counter against the last one received
         if diff_with_wrap(self.last_counter, vcdu.counter(), 1 << 24) > 1 {
@@ -552,6 +552,7 @@ impl VirtualChannel {
                 if first_header != 2047 && first_header < bytes_needed {
                     // if first_header is not 2047, then it represents how many bytes to read
                     // before the header
+                    // TODO debug 'needed 661 bytes to finish this TP_PDU, but first_header is only 0'
                     panic!(
                         "needed {} bytes to finish this TP_PDU, but first_header is only {}",
                         bytes_needed, first_header
@@ -582,6 +583,9 @@ impl VirtualChannel {
                 // assert!(offset - 2 <= first_header, "offset {} is past first_header {}", offset - 2, first_header);
             } else {
                 // if not complete, then we should have no more bytes to read
+                if first_header != 2047 {
+                    info!("XXX TP_PDU is still completed, first_header was {first_header}");
+                }
                 assert_eq!(offset, data.len());
                 self.current_tp_pdu = Some(tp_pdu); // store it for later
                 return lrits;
@@ -621,12 +625,12 @@ impl VirtualChannel {
     ///
     /// If this was the last TP_PDU in an LRIT file, a new LRIT file can be returned.
     /// Else, this TP_PDU is added
-    fn process(&mut self, tp_pdu: TP_PDU, stats: &mut crate::Stats) -> Option<LRIT> {
+    fn process(&mut self, tp_pdu: TP_PDU, stats: &mut crate::stats::Stats) -> Option<LRIT> {
         let apid = tp_pdu.APID().unwrap();
         if apid == 2047 {
             return None;
         }
-        stats.record(crate::Stat::APID(apid));
+        stats.record(crate::stats::Stat::APID(apid));
         let flags = tp_pdu.flags().unwrap();
         assert!(flags >= 0);
         assert!(flags <= 3);
@@ -660,7 +664,7 @@ impl VirtualChannel {
             } else {
                 // ignore this
                 //println!("Dropping data for unknow apid {}", apid);
-                stats.record(crate::Stat::DiscardedDataPacket);
+                stats.record(crate::stats::Stat::DiscardedDataPacket);
             }
         } else if flags == 2 {
             // this is the final packet

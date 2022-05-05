@@ -1,5 +1,7 @@
 #![allow(unused_imports)]
 
+use goesbox::handlers;
+use goesbox::lrit::VCDU;
 use log::warn;
 use nanomsg::{Protocol, Socket};
 
@@ -18,14 +20,7 @@ use std::io::{Read, Write};
 use std::time::{Duration, Instant};
 
 mod ui;
-use ui::{App, Stat, Stats};
-
-mod lrit;
-use lrit::*;
-
-mod crc;
-
-pub mod handlers;
+use ui::App;
 
 pub fn set_panic_handler() {
     let old_hook = std::panic::take_hook();

@@ -7,9 +7,9 @@ use std::{
     path::PathBuf,
 };
 
-use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
+use byteorder::{LittleEndian, ReadBytesExt};
 use chrono::Utc;
-use log::{debug, info, warn};
+use log::{info, warn};
 
 use crate::{crc, handlers::HandlerError};
 
