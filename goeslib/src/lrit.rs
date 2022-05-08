@@ -30,12 +30,7 @@ pub struct LRIT {
 
 impl Debug for LRIT {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-        write!(
-            f,
-            "<LRIT headers: {:?} data.len: {}",
-            self.headers,
-            self.data.len()
-        )
+        write!(f, "<LRIT headers: {:?} data.len: {}", self.headers, self.data.len())
     }
 }
 
@@ -159,10 +154,7 @@ impl TP_PDU {
             let computed = crc::calc_crc16(&self.data[..len - 2]);
             let received = (self.data[len - 2] as u16) << 8 | self.data[len - 1] as u16;
             if computed != received {
-                warn!(
-                    "Computed CRC {:x} does not match recieved CRC {:x}",
-                    computed, received
-                );
+                warn!("Computed CRC {:x} does not match recieved CRC {:x}", computed, received);
             }
 
             computed == received
@@ -286,8 +278,7 @@ impl TP_PDU {
             let needed_bytes = packet_len as usize - self.data.len();
             assert!(needed_bytes > 0);
             let a = std::cmp::min(needed_bytes, bytes.len() - bytes_used);
-            self.data
-                .extend_from_slice(&bytes[bytes_used..bytes_used + a]);
+            self.data.extend_from_slice(&bytes[bytes_used..bytes_used + a]);
             bytes_used + a // how many total bytes we used
         } else {
             bytes_used
@@ -335,9 +326,7 @@ impl Session {
         assert!(pdu.header_complete());
         assert!(pdu.data_complete());
         assert!(pdu.is_crc_ok());
-        let seq = pdu
-            .sequence_count()
-            .expect("pdu sequence should never be None");
+        let seq = pdu.sequence_count().expect("pdu sequence should never be None");
         let apid = pdu.APID().expect("APID should never be None");
 
         let _ver = pdu.version();
@@ -408,31 +397,36 @@ impl Session {
         assert!(pdu.header_complete());
         assert!(pdu.data_complete());
         if !pdu.is_crc_ok() {
-            warn!(
-                "Refusing to append data that failed CRC (apid {})",
-                pdu.APID().unwrap()
-            );
+            warn!("Refusing to append data that failed CRC (apid {})", pdu.APID().unwrap());
             return;
         }
         // remove the 2 CRC bytes (which we've just verified)
         pdu.data.truncate(pdu.data.len() - 2);
 
-        let new_seq = pdu
-            .sequence_count()
-            .expect("pdu sequence should never be None");
+        let new_seq = pdu.sequence_count().expect("pdu sequence should never be None");
 
         // Note: 4_LRIT_Transmitter-specs.pdf section 6.2.1 says that this sequence number is 14 bit modulo 16394
         //       but that is almost certainly a typo
         if diff_with_wrap(self.last_seq as u32, new_seq as u32, 1 << 14) > 1 {
             //if new_seq != self.last_seq + 1 {
             let skipped = new_seq as isize - self.last_seq as isize;
-            warn!("VC XXX: Detected TP_PDU drop (skipped {} packet(s) on APID {}; prev: {}, packet: {})",
-            skipped - 1, self.apid, self.last_seq, new_seq);
+            warn!(
+                "VC XXX: Detected TP_PDU drop (skipped {} packet(s) on APID {}; prev: {}, packet: {})",
+                skipped - 1,
+                self.apid,
+                self.last_seq,
+                new_seq
+            );
         }
         self.last_seq = new_seq;
         if let DecompInfo::Needed(ref mut params) = self.needs_decomp {
             let num_columns = params.pixels_per_scanline() as usize;
-            assert!(pdu.data.len() <= num_columns, "session needs rice decomp, but bytes to decomp ({}) is greater than image cols ({})", pdu.data.len() - 2, num_columns);
+            assert!(
+                pdu.data.len() <= num_columns,
+                "session needs rice decomp, but bytes to decomp ({}) is greater than image cols ({})",
+                pdu.data.len() - 2,
+                num_columns
+            );
 
             let mut out_buf = Vec::with_capacity(num_columns as usize);
             // match acres::decompress(&pdu.data, &mut out_buf, params) {
@@ -458,15 +452,17 @@ impl Session {
         //let header = crate::lrit::PrimaryHeader::from_data(&self.bytes[10..]);
         //info!("primary header: {:?}", header);
         let headers = read_headers(&self.bytes);
-        let data = self
-            .bytes
-            .split_off(headers.primary.total_header_length as usize);
+        let data = self.bytes.split_off(headers.primary.total_header_length as usize);
         if let Some(_rice) = &headers.rice_compression {
             //let ish = headers.img_strucutre.as_ref().unwrap();
             //info!("{:?}", headers);
             //info!("ish.cols={}, datalen={}", ish.num_columns, data.len());
         }
-        return LRIT { vcid: self.vcid, headers, data };
+        return LRIT {
+            vcid: self.vcid,
+            headers,
+            data,
+        };
         //info!("Headers: {:?}", headers);
 
         //let root = std::path::Path::new("/nas/achin/devel/goes-dht/out_new");
@@ -967,10 +963,7 @@ impl ImageNavigationRecord {
 
         let mut name_buf = [' ' as u8; 32];
         cur.read_exact(&mut name_buf);
-        let name = String::from_utf8_lossy(&name_buf)
-            .to_owned()
-            .trim()
-            .to_owned();
+        let name = String::from_utf8_lossy(&name_buf).to_owned().trim().to_owned();
 
         let col_scaling_factor = cur.read_i32::<NetworkEndian>().unwrap();
         let line_scaling_factor = cur.read_i32::<NetworkEndian>().unwrap();
@@ -1143,7 +1136,13 @@ pub struct ImageDataFunctionRecord {
 // A custom implementation that doesn't show all the bytes of self.data
 impl std::fmt::Debug for ImageDataFunctionRecord {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-        write!(f, "ImageDataFunctionRecord {{ header_type: {:?}, header_record_lenth: {:?}, data: {} bytes }}", self.header_type, self.header_record_lenth, self.data.len())
+        write!(
+            f,
+            "ImageDataFunctionRecord {{ header_type: {:?}, header_record_lenth: {:?}, data: {} bytes }}",
+            self.header_type,
+            self.header_record_lenth,
+            self.data.len()
+        )
     }
 }
 

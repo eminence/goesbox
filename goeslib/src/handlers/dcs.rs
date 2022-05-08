@@ -22,7 +22,7 @@ pub struct DcsHandler {
 impl DcsHandler {
     pub fn new() -> Self {
         Self {
-            output_root: PathBuf::from("/tank/achin/tmp/goes_out2"),
+            output_root: PathBuf::from("/tank/achin/tmp/goes_out3"),
         }
     }
 }
@@ -75,34 +75,34 @@ impl Handler for DcsHandler {
         for (idx, block) in blocks.into_iter().enumerate() {
             let pseudo_binary: Vec<_> = block.data.into_iter().skip(1).map(|x| x & 0x7f).collect();
 
-            let mut f = std::fs::File::create(self.output_root.join(format!(
-                "{base_name}-{:0>8X}-{idx:03}.dcs",
-                block.corrected_addr
-            )))?;
-            writeln!(f, "{:#?}\n\n", header)?;
-            writeln!(f, "Baud: {:?}", block.baud_rate)?;
-            writeln!(f, "platform: {:?}", block.platform)?;
-            writeln!(f, "Parity errors: {}", block.parity_errors)?;
-            writeln!(f, "Missing EOT: {}", block.missing_eot)?;
-            writeln!(f, "Addr corrected: {}", block.addr_corrected)?;
-            writeln!(f, "Bad addr: {}", block.bad_addr)?;
-            writeln!(f, "Invalid addr: {}", block.invalid_addr)?;
-            writeln!(f, "Incomplete PDT: {}", block.incomplete_pdt)?;
-            writeln!(f, "Timing error: {}", block.timing_error)?;
-            writeln!(f, "Unexpected message: {}", block.unexpected_message)?;
-            writeln!(f, "Wrong channel: {}", block.wrong_channel)?;
-            writeln!(f, "Corrected addr: {:0>8X}", block.corrected_addr)?;
-            writeln!(f, "Carrier Start: {:?}", block.carrier_start)?;
-            writeln!(f, "Carrier End: {:?}", block.carrier_end)?;
-            writeln!(f, "Signal strength: {} dBm EIRP", block.signal_strength)?;
-            writeln!(f, "Freq offset: {}Hz", block.freq_offset)?;
-            writeln!(f, "Phase noise: {}° RMS", block.phase_noise)?;
-            writeln!(f, "Good phase: {}", block.good_phase)?;
-            writeln!(f, "Space platform: {:?}", block.space_platform)?;
-            writeln!(f, "Channel: {}", block.channel_number)?;
-            writeln!(f, "Source platform: {:?}", block.source_platform)?;
+            // let mut f = std::fs::File::create(self.output_root.join(format!(
+            //     "{base_name}-{:0>8X}-{idx:03}.dcs",
+            //     block.corrected_addr
+            // )))?;
+            // writeln!(f, "{:#?}\n\n", header)?;
+            // writeln!(f, "Baud: {:?}", block.baud_rate)?;
+            // writeln!(f, "platform: {:?}", block.platform)?;
+            // writeln!(f, "Parity errors: {}", block.parity_errors)?;
+            // writeln!(f, "Missing EOT: {}", block.missing_eot)?;
+            // writeln!(f, "Addr corrected: {}", block.addr_corrected)?;
+            // writeln!(f, "Bad addr: {}", block.bad_addr)?;
+            // writeln!(f, "Invalid addr: {}", block.invalid_addr)?;
+            // writeln!(f, "Incomplete PDT: {}", block.incomplete_pdt)?;
+            // writeln!(f, "Timing error: {}", block.timing_error)?;
+            // writeln!(f, "Unexpected message: {}", block.unexpected_message)?;
+            // writeln!(f, "Wrong channel: {}", block.wrong_channel)?;
+            // writeln!(f, "Corrected addr: {:0>8X}", block.corrected_addr)?;
+            // writeln!(f, "Carrier Start: {:?}", block.carrier_start)?;
+            // writeln!(f, "Carrier End: {:?}", block.carrier_end)?;
+            // writeln!(f, "Signal strength: {} dBm EIRP", block.signal_strength)?;
+            // writeln!(f, "Freq offset: {}Hz", block.freq_offset)?;
+            // writeln!(f, "Phase noise: {}° RMS", block.phase_noise)?;
+            // writeln!(f, "Good phase: {}", block.good_phase)?;
+            // writeln!(f, "Space platform: {:?}", block.space_platform)?;
+            // writeln!(f, "Channel: {}", block.channel_number)?;
+            // writeln!(f, "Source platform: {:?}", block.source_platform)?;
 
-            f.write_all(&pseudo_binary)?;
+            // f.write_all(&pseudo_binary)?;
         }
 
         Ok(())
@@ -154,10 +154,7 @@ impl DcsHeader {
 
         let computed_header_crc = crc::calc_crc32(&data[..60]);
         if computed_header_crc != header_crc {
-            warn!(
-                "Header CRC mismatch: {:x} != {:x}",
-                computed_header_crc, header_crc
-            );
+            warn!("Header CRC mismatch: {:x} != {:x}", computed_header_crc, header_crc);
         }
 
         let computed_file_crc = crc::calc_crc32(&data[..data.len() - 4]);
@@ -167,10 +164,7 @@ impl DcsHeader {
         let file_crc = cur.read_u32::<LittleEndian>()?;
 
         if computed_file_crc != file_crc {
-            warn!(
-                "File CRC mismatch: {:x} != {:x}",
-                computed_file_crc, file_crc
-            );
+            warn!("File CRC mismatch: {:x} != {:x}", computed_file_crc, file_crc);
         }
 
         let name = String::from_utf8_lossy(&name_buf).trim().to_string();
@@ -180,9 +174,7 @@ impl DcsHeader {
             .parse()
             .map_err(|e| HandlerError::Parse("Failed to parse payload len in DCS header"))?;
         let payload_source = String::from_utf8_lossy(&source_buf).trim().to_string();
-        let payload_type = String::from_utf8_lossy(&payload_type_buf)
-            .trim()
-            .to_string();
+        let payload_type = String::from_utf8_lossy(&payload_type_buf).trim().to_string();
 
         Ok(Self {
             name,
@@ -400,8 +392,7 @@ impl DcsBlock {
                 + (carrier_start_buf[0] as u32 >> 4);
 
             let start_date = chrono::NaiveDate::from_yo(2000 + year as i32, day);
-            let start =
-                start_date.and_hms_milli(hour as u32, minute as u32, second as u32, millis as u32);
+            let start = start_date.and_hms_milli(hour as u32, minute as u32, second as u32, millis as u32);
             let start = chrono::DateTime::<Utc>::from_utc(start, chrono::Utc);
 
             // carrier end
@@ -422,8 +413,7 @@ impl DcsBlock {
                 + (carrier_end_buf[0] as u32 >> 4);
 
             let end_date = chrono::NaiveDate::from_yo(2000 + year as i32, day);
-            let end =
-                end_date.and_hms_milli(hour as u32, minute as u32, second as u32, millis as u32);
+            let end = end_date.and_hms_milli(hour as u32, minute as u32, second as u32, millis as u32);
             let end = chrono::DateTime::<Utc>::from_utc(end, chrono::Utc);
 
             // signal strength (10 bits)

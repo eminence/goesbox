@@ -25,7 +25,7 @@ pub struct ImageHandler {
 impl ImageHandler {
     pub fn new() -> ImageHandler {
         ImageHandler {
-            output_root: PathBuf::from("/tank/achin/tmp/goes_out2"),
+            output_root: PathBuf::from("/tank/achin/tmp/goes_out3"),
             segments: lru_cache::LruCache::new(3),
         }
     }
@@ -38,11 +38,7 @@ impl Handler for ImageHandler {
         }
 
         // these headers are mandatory for image data:
-        let ihs = lrit
-            .headers
-            .img_strucutre
-            .as_ref()
-            .expect("image structure header");
+        let ihs = lrit.headers.img_strucutre.as_ref().expect("image structure header");
         let annotation = lrit.headers.annotation.as_ref().expect("Annotation header");
 
         // images
@@ -68,20 +64,13 @@ impl Handler for ImageHandler {
         if !segmented {
             // write out image immeditally
             //info!("headers: {:?}", lrit.headers);
-            assert_eq!(
-                ihs.bits_per_pixel, 8,
-                "Found non grayscale image: {:?}",
-                ihs
-            );
+            assert_eq!(ihs.bits_per_pixel, 8, "Found non grayscale image: {:?}", ihs);
 
             if let Some(noaa) = &lrit.headers.noaa {
                 if noaa.noaa_compression == 5 {
                     // gif image can be written directly to disk
-                    let mut file = std::fs::File::create(
-                        self.output_root
-                            .join(&annotation.text)
-                            .with_extension("gif"),
-                    )?;
+                    let mut file =
+                        std::fs::File::create(self.output_root.join(&annotation.text).with_extension("gif"))?;
                     file.write_all(&lrit.data)?;
                     return Ok(());
                 }
@@ -92,18 +81,11 @@ impl Handler for ImageHandler {
             let mut data = lrit.data.clone();
             data.resize(ihs.num_columns as usize * ihs.num_lines as usize, 0);
             // save raw pixel data
-            let img: image::GrayImage =
-                image::GrayImage::from_raw(ihs.num_columns as u32, ihs.num_lines as u32, data)
-                    .unwrap_or_else(|| {
-                        panic!(
-                            "Failed to create img for {}:\n{:?}",
-                            &annotation.text, lrit.headers
-                        );
-                    });
-            let out_name = self
-                .output_root
-                .join(&annotation.text)
-                .with_extension("jpg");
+            let img: image::GrayImage = image::GrayImage::from_raw(ihs.num_columns as u32, ihs.num_lines as u32, data)
+                .unwrap_or_else(|| {
+                    panic!("Failed to create img for {}:\n{:?}", &annotation.text, lrit.headers);
+                });
+            let out_name = self.output_root.join(&annotation.text).with_extension("jpg");
             info!("{}", out_name.display());
 
             img.save(out_name)?;
@@ -111,11 +93,7 @@ impl Handler for ImageHandler {
             return Ok(());
         }
 
-        let seg = lrit
-            .headers
-            .img_segment
-            .as_ref()
-            .expect("image segment header");
+        let seg = lrit.headers.img_segment.as_ref().expect("image segment header");
 
         // have we seen segments with this image id before?
         if let Some(mut seg_vec) = self.segments.remove(&seg.image_id) {
@@ -152,11 +130,7 @@ impl ImageHandler {
             .as_ref()
             .expect("img_structure header")
             .clone();
-        assert_eq!(
-            ihs.bits_per_pixel, 8,
-            "Found non grayscale image: {:?}",
-            ihs
-        );
+        assert_eq!(ihs.bits_per_pixel, 8, "Found non grayscale image: {:?}", ihs);
         let seg = segments
             .first()
             .unwrap()
@@ -197,22 +171,13 @@ impl ImageHandler {
 
         let segments = new_segments;
 
-        let mut pixels: Vec<u8> =
-            Vec::with_capacity(ihs.num_columns as usize * seg.max_row as usize);
+        let mut pixels: Vec<u8> = Vec::with_capacity(ihs.num_columns as usize * seg.max_row as usize);
         pixels.resize(seg.max_row as usize * seg.max_column as usize, 0u8);
 
         for lrit in segments {
             if let Some(lrit) = lrit {
-                let seg = lrit
-                    .headers
-                    .img_segment
-                    .as_ref()
-                    .expect("img_segment header");
-                let ihs = lrit
-                    .headers
-                    .img_strucutre
-                    .as_ref()
-                    .expect("img_structure header");
+                let seg = lrit.headers.img_segment.as_ref().expect("img_segment header");
+                let ihs = lrit.headers.img_strucutre.as_ref().expect("img_structure header");
 
                 let start = seg.max_column as usize * seg.start_line as usize;
                 //let end = start + (ihs.num_lines  as usize * seg.max_column as usize);
@@ -243,10 +208,7 @@ impl ImageHandler {
                 ImageStructureRecord { header_type: 1, header_record_lenth: 9, bits_per_pixel: 8, num_columns: 5424, num_lines: 339, compression: 1 }
                 ImageSegmentIdentificationRecord { header_type: 128, header_record_lenth: 17, image_id: 58004, segment_seq: 1, start_col: 0, start_line: 339, max_segment: 16, max_column: 5424, max_row: 5424 }
                                    */
-                info!(
-                    "failed to create image, pixlen={} {:?} {:?}",
-                    pixlen, ihs, seg
-                );
+                info!("failed to create image, pixlen={} {:?} {:?}", pixlen, ihs, seg);
             }
         }
         Ok(())

@@ -4,8 +4,8 @@ use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 
 use crossbeam_channel::Sender;
-use goesbox::lrit::{self, VirtualChannel, LRIT};
-use goesbox::stats::{Stat, Stats};
+use goeslib::lrit::{self, VirtualChannel, LRIT};
+use goeslib::stats::{Stat, Stats};
 use std::io;
 use termion::raw::IntoRawMode;
 use tui::backend::Backend;
@@ -42,12 +42,9 @@ impl log::Log for AppLogger {
         if !record.target().starts_with("goes_dht") && record.level() >= log::Level::Debug {
             return;
         }
-        let _ = self.app_channel.send(format!(
-            "{} {} {}",
-            record.target(),
-            record.level(),
-            record.args()
-        ));
+        let _ = self
+            .app_channel
+            .send(format!("{} {} {}", record.target(), record.level(), record.args()));
     }
 
     fn flush(&self) {}
@@ -108,14 +105,7 @@ impl App {
         terminal.draw(|mut f| {
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints(
-                    [
-                        Constraint::Percentage(10),
-                        Constraint::Length(10),
-                        Constraint::Min(20),
-                    ]
-                    .as_ref(),
-                )
+                .constraints([Constraint::Percentage(10), Constraint::Length(10), Constraint::Min(20)].as_ref())
                 .split(f.size());
 
             self.draw_stats(&mut f, chunks[1]);
@@ -154,11 +144,7 @@ impl App {
             .bar_width(4)
             .bar_gap(1)
             .max(60)
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .title("VCDU receive rates (pps)"),
-            )
+            .block(Block::default().borders(Borders::ALL).title("VCDU receive rates (pps)"))
             .render(f, area);
     }
 

@@ -13,7 +13,7 @@ pub struct TextHandler {
 impl TextHandler {
     pub fn new() -> TextHandler {
         TextHandler {
-            output_root: PathBuf::from("/tank/achin/tmp/goes_out2"), // hell yes hardcoded output paths
+            output_root: PathBuf::from("/tank/achin/tmp/goes_out3"), // hell yes hardcoded output paths
         }
     }
 }
@@ -39,8 +39,7 @@ impl Handler for TextHandler {
             for idx in 0..archive.len() {
                 if let Ok(mut file) = archive.by_index(idx) {
                     //info!("Zip archive file {}", file.name());
-                    let mut output_file =
-                        std::fs::File::create(self.output_root.join(file.sanitized_name()))?;
+                    let mut output_file = std::fs::File::create(self.output_root.join(file.sanitized_name()))?;
                     std::io::copy(&mut file, &mut output_file)?;
                 }
             }
@@ -48,9 +47,7 @@ impl Handler for TextHandler {
             // try to print data
             //let s = String::from_utf8_lossy(&self.bytes[offset as usize..]);
             if let Some(annotation) = &lrit.headers.annotation {
-                if let Ok(mut output_file) =
-                    std::fs::File::create(self.output_root.join(&annotation.text))
-                {
+                if let Ok(mut output_file) = std::fs::File::create(self.output_root.join(&annotation.text)) {
                     output_file.write_all(&lrit.data)?;
                 }
             }

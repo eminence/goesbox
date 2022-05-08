@@ -1,7 +1,7 @@
 #![allow(unused_imports)]
 
-use goesbox::handlers;
-use goesbox::lrit::VCDU;
+use goeslib::handlers;
+use goeslib::lrit::VCDU;
 use log::warn;
 use nanomsg::{Protocol, Socket};
 
@@ -60,9 +60,7 @@ pub fn set_panic_handler() {
 fn main() -> Result<(), io::Error> {
     set_panic_handler();
 
-    let target: String = std::env::args()
-        .nth(1)
-        .unwrap_or("tcp://127.0.0.1:5004".to_owned());
+    let target: String = std::env::args().nth(1).unwrap_or("tcp://127.0.0.1:5004".to_owned());
 
     let stdout = io::stdout().into_raw_mode()?;
     let backend = TermionBackend::new(stdout);
