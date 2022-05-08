@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 goeslib = {path = "../goeslib" }
-tui = "0.6.1"
+tui = { version = "0.18", features = ["termion"] }
 termion = "*"
 crossbeam = "0.8.1"
 crossbeam-channel = "0.5.4"

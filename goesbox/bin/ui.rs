@@ -1,26 +1,25 @@
 //! A text-based user interface for the goesbox.
 
+use goeslib::lrit::{VirtualChannel, VCDU};
+use goeslib::stats::{Stat, Stats};
 use goeslib::{handlers, lrit};
-use goeslib::lrit::{VCDU, VirtualChannel};
-use goeslib::stats::{Stats, Stat};
 use log::warn;
 use nanomsg::{Protocol, Socket};
+use tui::text::{Span, Spans};
 
 use std::io;
 use termion::event::Key;
 use termion::raw::IntoRawMode;
-use tui::backend::{TermionBackend, Backend};
+use tui::backend::{Backend, TermionBackend};
 use tui::layout::{Constraint, Direction, Layout, Rect};
-use tui::widgets::{BarChart, Block, Borders, Paragraph, Text, Widget};
-use tui::{Terminal, Frame};
+use tui::widgets::{BarChart, Block, Borders, Paragraph, Widget, Wrap};
+use tui::{Frame, Terminal};
 
-use crossbeam_channel::{select, Sender};
 use crossbeam_channel::unbounded;
+use crossbeam_channel::{select, Sender};
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::time::{Duration, Instant};
-
-
 
 const MIN_DRAW_INTERVAL: Duration = Duration::from_millis(100);
 
@@ -147,13 +146,13 @@ impl App {
             .collect();
         let d: Vec<(&str, u64)> = d.iter().map(|(a, b)| (a.as_ref(), *b)).collect();
 
-        BarChart::default()
+        let widget = BarChart::default()
             .data(&d)
             .bar_width(4)
             .bar_gap(1)
             .max(60)
-            .block(Block::default().borders(Borders::ALL).title("VCDU receive rates (pps)"))
-            .render(f, area);
+            .block(Block::default().borders(Borders::ALL).title("VCDU receive rates (pps)"));
+        f.render_widget(widget, area)
     }
 
     fn draw_messages<B>(&self, f: &mut Frame<B>, area: Rect)
@@ -169,23 +168,23 @@ impl App {
             0
         };
 
-        let msg: Vec<_> = self
+        let msg: Vec<Spans> = self
             .messages
             .iter()
             .skip(to_skip)
             .map(|m| {
-                Text::raw({
+                Spans::from(vec![Span::raw({
                     let mut s = m.clone();
                     s.push('\n');
                     s
-                })
+                })])
             })
             .collect();
 
-        Paragraph::new(msg.iter().map(|m| m))
-            .wrap(true)
-            .block(Block::default().borders(Borders::ALL).title("Messages"))
-            .render(f, area);
+        let widget = Paragraph::new(msg)
+            .wrap(Wrap { trim: true })
+            .block(Block::default().borders(Borders::ALL).title("Messages"));
+        f.render_widget(widget, area);
     }
 }
 
@@ -223,7 +222,6 @@ pub fn set_panic_handler() {
         old_hook(info)
     }));
 }
-
 
 fn main() -> Result<(), io::Error> {
     set_panic_handler();
