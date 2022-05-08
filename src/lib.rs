@@ -6,3 +6,5 @@ pub mod lrit;
 pub mod crc;
 
 pub mod stats;
+
+pub mod emwin;
