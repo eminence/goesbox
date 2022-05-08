@@ -6,3 +6,15 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+goeslib = {path = "../goeslib" }
+tui = "0.6.1"
+termion = "*"
+crossbeam = "0.7"
+crossbeam-channel = "0.3.8"
+log = {version = "0.4", features = ["std"]}
+nanomsg = {version = "0.7.2", features = ["bundled"]}
+
+
+[[bin]]
+name = "goesbox-ui"
+path = "bin/ui.rs"

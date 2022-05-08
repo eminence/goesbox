@@ -7,15 +7,8 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-nanomsg = {version = "0.7.2", features = ["bundled"]}
-
-tui = "0.6.1"
-termion = "*"
-crossbeam = "0.7"
-crossbeam-channel = "0.3.8"
 log = {version = "0.4", features = ["std"]}
 byteorder = "1"
-inflate = "0.4.5"
 zip = "0.5.2"
 image = "0.22"
 acres = {git = "https://github.com/agrif/acres"}
