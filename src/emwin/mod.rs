@@ -1,6 +1,7 @@
 //! Various ulitities for parsing EMWIN and NWS data
 //!
 //!
+pub mod nws;
 pub mod wmo;
 
 use chrono::Utc;
@@ -34,6 +35,8 @@ pub struct ParsedEmwinName {
     pub sequence: u32,
 
     pub priority: Priority,
+
+    pub nws_product: Option<nws::NWSProduct>,
 
     pub legacy_filename: String,
 }
@@ -411,6 +414,8 @@ impl ParsedEmwinName {
         // rest of the characters (6) are the old GOES-R product name
         let legacy_filename = filename[50..].to_string();
 
+        let nws_product = nws::NWSProduct::from_str(&legacy_filename[0..3]);
+
         Some(ParsedEmwinName {
             pflag,
             data_type_1: t1,
@@ -421,6 +426,7 @@ impl ParsedEmwinName {
             date,
             sequence,
             priority,
+            nws_product,
             legacy_filename,
         })
     }
@@ -442,6 +448,9 @@ mod tests {
 
         let c = ParsedEmwinName::parse("A_SXAK58PACR051736_C_KWIN_20220505173627_959486-2-HYDACRAK").unwrap();
         println!("{c:?}");
+
+        let d = ParsedEmwinName::parse("A_FPUS20KWBN071250_C_KWIN_20220507125113_106868-3-SCSWBNUS.lrit").unwrap();
+        println!("{d:?}");
     }
 
     #[test]
