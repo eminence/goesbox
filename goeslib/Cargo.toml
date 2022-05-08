@@ -9,8 +9,8 @@ edition = "2018"
 [dependencies]
 log = {version = "0.4", features = ["std"]}
 byteorder = "1"
-zip = "0.5.2"
-image = "0.22"
+zip = "0.6.2"
+image = "0.24"
 acres = {git = "https://github.com/agrif/acres"}
 lru-cache = "0.1.2"
 crc-any = "2.4.2"

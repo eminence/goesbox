@@ -1,3 +1,5 @@
+use std::error::Error;
+
 use crate::lrit::LRIT;
 
 mod dcs;
@@ -27,6 +29,8 @@ pub enum HandlerError {
 
     /// Some parsing error
     Parse(&'static str),
+
+    Other(Box<dyn Error>),
 }
 
 impl From<std::io::Error> for HandlerError {
@@ -38,6 +42,15 @@ impl From<std::io::Error> for HandlerError {
 impl From<zip::result::ZipError> for HandlerError {
     fn from(zip: zip::result::ZipError) -> Self {
         Self::Zip(zip)
+    }
+}
+
+impl From<::image::ImageError> for HandlerError {
+    fn from(e: ::image::ImageError) -> Self {
+        match e {
+            ::image::ImageError::IoError(io) => Self::Io(io),
+            other => Self::Other(Box::new(other)),
+        }
     }
 }
 
