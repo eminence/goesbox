@@ -228,7 +228,12 @@ pub fn set_panic_handler() {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     set_panic_handler();
 
-    let target: String = std::env::args().nth(1).unwrap_or("tcp://127.0.0.1:5004".to_owned());
+    let mut args = std::env::args().skip(1);
+    let target: String = args.next().expect(
+        "Missing first arg: target. \
+        Example tcp://localhost:5004",
+    );
+    let output_root = args.next().expect("Missing second arg: output root");
 
     let stdout = io::stdout().into_raw_mode()?;
     let backend = TermionBackend::new(stdout);
@@ -277,10 +282,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     let mut handlers: Vec<Box<dyn handlers::Handler>> = Vec::new();
-    handlers.push(Box::new(handlers::TextHandler::new()));
-    handlers.push(Box::new(handlers::ImageHandler::new()));
-    handlers.push(Box::new(handlers::DcsHandler::new()));
-    handlers.push(Box::new(handlers::DebugHandler::new()));
+    handlers.push(Box::new(handlers::TextHandler::new(&output_root)));
+    handlers.push(Box::new(handlers::ImageHandler::new(&output_root)));
+    handlers.push(Box::new(handlers::DcsHandler::new(&output_root)));
+    handlers.push(Box::new(handlers::DebugHandler::new(&output_root)));
 
     loop {
         select! {

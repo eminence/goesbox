@@ -4,7 +4,7 @@
 use std::{
     fs::File,
     io::{Read, Seek, SeekFrom, Write},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use byteorder::{LittleEndian, ReadBytesExt};
@@ -20,9 +20,9 @@ pub struct DcsHandler {
 }
 
 impl DcsHandler {
-    pub fn new() -> Self {
+    pub fn new(root: impl AsRef<Path>) -> Self {
         Self {
-            output_root: PathBuf::from("/tank/achin/tmp/goes_out3"),
+            output_root: root.as_ref().to_path_buf(),
         }
     }
 }

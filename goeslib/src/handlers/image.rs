@@ -2,7 +2,11 @@
 //!
 //! Image products are identified by having a filetype_code of 0 in the primary header.
 //! (Source: 4_LRIT_Transmitter-specs.pdf Table 3: LRIT File Types)
-use std::{collections::HashMap, io::Write, path::PathBuf};
+use std::{
+    collections::HashMap,
+    io::Write,
+    path::{Path, PathBuf},
+};
 
 use log::info;
 
@@ -23,9 +27,9 @@ pub struct ImageHandler {
 }
 
 impl ImageHandler {
-    pub fn new() -> ImageHandler {
+    pub fn new(root: impl AsRef<Path>) -> ImageHandler {
         ImageHandler {
-            output_root: PathBuf::from("/tank/achin/tmp/goes_out3"),
+            output_root: root.as_ref().to_path_buf(),
             segments: lru_cache::LruCache::new(3),
         }
     }

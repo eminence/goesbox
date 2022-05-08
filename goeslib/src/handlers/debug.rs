@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use log::warn;
 
@@ -13,9 +13,9 @@ pub struct DebugHandler {
 }
 
 impl DebugHandler {
-    pub fn new() -> Self {
+    pub fn new(root: impl AsRef<Path>) -> Self {
         DebugHandler {
-            output_root: PathBuf::from("/tank/achin/tmp/goes_out3"),
+            output_root: root.as_ref().to_path_buf(),
         }
     }
 }

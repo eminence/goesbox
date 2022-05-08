@@ -1,4 +1,7 @@
-use std::{io::Write, path::PathBuf};
+use std::{
+    io::Write,
+    path::{Path, PathBuf},
+};
 
 use log::info;
 
@@ -11,9 +14,9 @@ pub struct TextHandler {
 }
 
 impl TextHandler {
-    pub fn new() -> TextHandler {
+    pub fn new(root: impl AsRef<Path>) -> TextHandler {
         TextHandler {
-            output_root: PathBuf::from("/tank/achin/tmp/goes_out3"), // hell yes hardcoded output paths
+            output_root: root.as_ref().to_path_buf(),
         }
     }
 }
