@@ -12,7 +12,7 @@ use termion::event::Key;
 use termion::raw::IntoRawMode;
 use tui::backend::{Backend, TermionBackend};
 use tui::layout::{Constraint, Direction, Layout, Rect};
-use tui::widgets::{BarChart, Block, Borders, Paragraph, Widget, Wrap};
+use tui::widgets::{BarChart, Block, Borders, Paragraph, Wrap};
 use tui::{Frame, Terminal};
 
 use crossbeam_channel::unbounded;
@@ -41,7 +41,7 @@ impl AppLogger {
 }
 
 impl log::Log for AppLogger {
-    fn enabled(&self, metadata: &log::Metadata) -> bool {
+    fn enabled(&self, _metadata: &log::Metadata) -> bool {
         true
     }
 
@@ -69,7 +69,7 @@ impl App {
 
     /// Process an incoming VCDU packet, and return any completed LRIT files (if any)
     pub fn process(&mut self, vcdu: lrit::VCDU) -> Vec<lrit::LRIT> {
-        let id = vcdu.VCID();
+        let id = vcdu.vcid();
         self.record(Stat::Packet);
         self.record(Stat::VCDUPacket(id));
         if vcdu.is_fill() {
@@ -105,9 +105,9 @@ impl App {
         }
     }
 
-    pub fn draw<B: Backend>(&mut self, terminal: &mut Terminal<B>) {
+    pub fn draw<B: Backend>(&mut self, terminal: &mut Terminal<B>) -> std::io::Result<()> {
         if self.last_draw.elapsed() <= MIN_DRAW_INTERVAL {
-            return;
+            return Ok(());
         }
         terminal.draw(|mut f| {
             let chunks = Layout::default()
@@ -117,8 +117,10 @@ impl App {
 
             self.draw_stats(&mut f, chunks[1]);
             self.draw_messages(&mut f, chunks[2]);
-        });
+        })?;
         self.last_draw = Instant::now();
+
+        Ok(())
     }
 
     fn draw_stats<B>(&mut self, f: &mut Frame<B>, area: Rect)
@@ -223,7 +225,7 @@ pub fn set_panic_handler() {
     }));
 }
 
-fn main() -> Result<(), io::Error> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     set_panic_handler();
 
     let target: String = std::env::args().nth(1).unwrap_or("tcp://127.0.0.1:5004".to_owned());
@@ -231,12 +233,12 @@ fn main() -> Result<(), io::Error> {
     let stdout = io::stdout().into_raw_mode()?;
     let backend = TermionBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
-    terminal.clear();
+    terminal.clear()?;
 
     // channels for messaging
     let (s, log_receiver) = unbounded();
     let logger = AppLogger::new(s);
-    log::set_boxed_logger(Box::new(logger));
+    log::set_boxed_logger(Box::new(logger))?;
     log::set_max_level(log::LevelFilter::Debug);
 
     let mut app = App::new();
@@ -260,7 +262,7 @@ fn main() -> Result<(), io::Error> {
                 eprintln!("Read a packet that wasn't 892 bytes!");
                 return;
             }
-            s.send(buf[..num_bytes_read].to_owned());
+            s.send(buf[..num_bytes_read].to_owned()).unwrap();
         }
     });
 
@@ -270,7 +272,7 @@ fn main() -> Result<(), io::Error> {
         use termion::input::TermRead;
         let stdin = io::stdin();
         for evt in stdin.keys() {
-            s.send(evt.unwrap());
+            s.send(evt.unwrap()).unwrap();
         }
     });
 
@@ -288,7 +290,7 @@ fn main() -> Result<(), io::Error> {
                     break;
                 } else if msg == Key::Char('c') {
                     app.clear_msg();
-                    app.draw(&mut terminal);
+                    app.draw(&mut terminal)?;
                 } else {
                     log::info!("got kbd {:?}", msg);
                 }
@@ -313,15 +315,15 @@ fn main() -> Result<(), io::Error> {
                         log::info!("{:?}", lrit.headers);
                     }
                 }
-                app.draw(&mut terminal);
+                app.draw(&mut terminal)?;
             },
             recv(log_receiver) -> data => {
                 let data = data.unwrap();
                 app.info(data);
-                app.draw(&mut terminal);
+                app.draw(&mut terminal)?;
             },
             default(Duration::from_millis(100)) => {
-                app.draw(&mut terminal);
+                app.draw(&mut terminal)?;
             }
 
         };

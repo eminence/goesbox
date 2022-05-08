@@ -2,7 +2,7 @@ use byteorder::{NetworkEndian, ReadBytesExt};
 use log::{info, warn};
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::io::{Read, Write};
+use std::io::Read;
 
 use crate::crc;
 
@@ -72,14 +72,14 @@ impl<'a> VCDU<'a> {
     /// Spacecraft ID
     ///
     /// This represents the spacecraft which sent this message
-    pub fn SCID(&self) -> u8 {
+    pub fn scid(&self) -> u8 {
         (self.bytes[0] & 0x3f) << 2 | (self.bytes[1] & 0xc0) >> 6
     }
 
     /// Virtual Channel ID
     ///
     /// This is a 6-bit field, so the max ID is 63 (which represents a fill packet)
-    pub fn VCID(&self) -> u8 {
+    pub fn vcid(&self) -> u8 {
         self.bytes[1] & 0x3f
     }
 
@@ -107,7 +107,7 @@ impl<'a> VCDU<'a> {
 
     /// Fill packets are sent on VCID 63
     pub fn is_fill(&self) -> bool {
-        self.VCID() == 63
+        self.vcid() == 63
     }
 }
 
@@ -116,7 +116,7 @@ impl<'a> VCDU<'a> {
 /// This unit stores up to 8190 bytes for a specific APID (application process identifier)
 ///
 /// Ref: 4_LRIT_Transmitter-specs.pdf Page 16
-struct TP_PDU {
+pub struct TpPdu {
     /// The header contains 6 bytes
     header: Vec<u8>,
     /// The data field is max 8190 bytes, plus 2 additional bytes for CRC
@@ -124,9 +124,9 @@ struct TP_PDU {
     vcid: u8,
 }
 
-impl TP_PDU {
-    pub fn new(vcid: u8) -> TP_PDU {
-        TP_PDU {
+impl TpPdu {
+    pub fn new(vcid: u8) -> TpPdu {
+        TpPdu {
             header: Vec::with_capacity(6),
             data: Vec::with_capacity(8192),
             vcid,
@@ -201,7 +201,7 @@ impl TP_PDU {
     ///
     /// APIDs between 0 and 191 are GOES LRIT application data.
     /// APID 2047 is a fill packet which contains no context
-    pub fn APID(&self) -> Option<u16> {
+    pub fn apid(&self) -> Option<u16> {
         if self.header.len() >= 2 {
             Some(((self.header[0] & 0b111) as u16) << 8 | self.header[1] as u16)
         } else {
@@ -247,7 +247,7 @@ impl TP_PDU {
                 len <= 8192,
                 "len {} is too long (apid {:?} vcid {})",
                 len,
-                self.APID(),
+                self.apid(),
                 self.vcid
             );
             Some(len)
@@ -322,12 +322,12 @@ fn check_headers_for_rice_compression(bytes: &[u8]) -> DecompInfo {
 
 impl Session {
     /// Create a new session from the first TP_PDU of some session layer data
-    pub fn new_from_pdu(pdu: TP_PDU) -> Session {
+    pub fn new_from_pdu(pdu: TpPdu) -> Session {
         assert!(pdu.header_complete());
         assert!(pdu.data_complete());
         assert!(pdu.is_crc_ok());
         let seq = pdu.sequence_count().expect("pdu sequence should never be None");
-        let apid = pdu.APID().expect("APID should never be None");
+        let apid = pdu.apid().expect("APID should never be None");
 
         let _ver = pdu.version();
 
@@ -393,11 +393,11 @@ impl Session {
         }
     }
 
-    pub fn append(&mut self, mut pdu: TP_PDU, stats: &crate::stats::Stats) {
+    pub fn append(&mut self, mut pdu: TpPdu, _stats: &crate::stats::Stats) {
         assert!(pdu.header_complete());
         assert!(pdu.data_complete());
         if !pdu.is_crc_ok() {
-            warn!("Refusing to append data that failed CRC (apid {})", pdu.APID().unwrap());
+            warn!("Refusing to append data that failed CRC (apid {})", pdu.apid().unwrap());
             return;
         }
         // remove the 2 CRC bytes (which we've just verified)
@@ -494,7 +494,7 @@ pub struct VirtualChannel {
     id: u8,
 
     /// Holds the current incomplete TP_PDU that we're working on (if any)
-    current_tp_pdu: Option<TP_PDU>,
+    current_tp_pdu: Option<TpPdu>,
 
     /// A map between APID and session-layer data
     apid_map: HashMap<u16, Session>,
@@ -516,7 +516,7 @@ impl VirtualChannel {
     pub fn process_vcdu(&mut self, vcdu: VCDU, stats: &mut crate::stats::Stats) -> Vec<LRIT> {
         let data = vcdu.data();
         assert_eq!(data.len(), 886);
-        assert_eq!(vcdu.VCID(), self.id);
+        assert_eq!(vcdu.vcid(), self.id);
 
         // check this vcdu counter against the last one received
         if diff_with_wrap(self.last_counter, vcdu.counter(), 1 << 24) > 1 {
@@ -605,7 +605,7 @@ impl VirtualChannel {
         }
 
         while offset < data.len() {
-            let mut tp_pdu = TP_PDU::new(vcdu.VCID());
+            let mut tp_pdu = TpPdu::new(vcdu.vcid());
             offset += tp_pdu.process_bytes(&data[offset..]);
             // note that while "first_header" is documented to point to the first TP_PDU with a header, it doesn't
             // mean that the TP_PDU will have a complete header!
@@ -626,14 +626,13 @@ impl VirtualChannel {
     ///
     /// If this was the last TP_PDU in an LRIT file, a new LRIT file can be returned.
     /// Else, this TP_PDU is added
-    fn process(&mut self, tp_pdu: TP_PDU, stats: &mut crate::stats::Stats) -> Option<LRIT> {
-        let apid = tp_pdu.APID().unwrap();
+    fn process(&mut self, tp_pdu: TpPdu, stats: &mut crate::stats::Stats) -> Option<LRIT> {
+        let apid = tp_pdu.apid().unwrap();
         if apid == 2047 {
             return None;
         }
         stats.record(crate::stats::Stat::APID(apid));
         let flags = tp_pdu.flags().unwrap();
-        assert!(flags >= 0);
         assert!(flags <= 3);
 
         if flags == 1 || flags == 3 {
@@ -881,10 +880,10 @@ impl PrimaryHeader {
 #[derive(Debug, Clone)]
 pub struct ImageStructureRecord {
     /// Header type, must always be 1
-    header_type: u8,
+    pub header_type: u8,
 
     /// Length of this header record, should always be 9
-    header_record_lenth: u16,
+    pub header_record_lenth: u16,
 
     pub bits_per_pixel: u8,
 
@@ -931,17 +930,17 @@ impl ImageStructureRecord {
 #[derive(Debug, Clone)]
 pub struct ImageNavigationRecord {
     /// Header type, must always be 2
-    header_type: u8,
+    pub header_type: u8,
 
     /// Length of this header record, should always be 51
-    header_record_lenth: u16,
+    pub header_record_lenth: u16,
 
-    projection_name: String,
+    pub projection_name: String,
 
-    column_scaling_factor: i32,
-    line_scaling_factor: i32,
-    column_offset: i32,
-    line_offset: i32,
+    pub column_scaling_factor: i32,
+    pub line_scaling_factor: i32,
+    pub column_offset: i32,
+    pub line_offset: i32,
 }
 
 impl LRITHeader for ImageNavigationRecord {
@@ -962,7 +961,7 @@ impl ImageNavigationRecord {
         let len = cur.read_u16::<NetworkEndian>().unwrap();
 
         let mut name_buf = [' ' as u8; 32];
-        cur.read_exact(&mut name_buf);
+        cur.read_exact(&mut name_buf).ok()?;
         let name = String::from_utf8_lossy(&name_buf).to_owned().trim().to_owned();
 
         let col_scaling_factor = cur.read_i32::<NetworkEndian>().unwrap();
@@ -992,7 +991,7 @@ impl ImageNavigationRecord {
 #[derive(Debug, Clone)]
 pub struct AnnotationRecord {
     /// Header type, must always be 4
-    header_type: u8,
+    pub header_type: u8,
 
     /// Length of this header record (variable)
     pub header_record_lenth: u16,
@@ -1016,7 +1015,7 @@ impl AnnotationRecord {
         let mut buf = Vec::with_capacity(len as usize - 3);
         buf.resize(len as usize - 3, ' ' as u8);
 
-        cur.read_exact(&mut buf);
+        cur.read_exact(&mut buf).ok()?;
         let text = String::from_utf8_lossy(&buf).to_owned().trim().to_owned();
 
         let header = AnnotationRecord {
@@ -1032,7 +1031,7 @@ impl AnnotationRecord {
 #[derive(Debug, Clone)]
 pub struct NOAALRITHeader {
     /// Header type, must always be 129
-    header_type: u8,
+    pub header_type: u8,
 
     /// Length of this header record, must be 14
     pub header_record_lenth: u16,
@@ -1061,8 +1060,8 @@ impl NOAALRITHeader {
         let len = cur.read_u16::<NetworkEndian>().unwrap();
 
         let mut buf = [' ' as u8; 4];
-        cur.read_exact(&mut buf);
-        let agency_sig = String::from_utf8_lossy(&buf).to_owned().trim().to_owned();
+        cur.read_exact(&mut buf).ok()?;
+        // let agency_sig = String::from_utf8_lossy(&buf).to_owned().trim().to_owned();
 
         let product_id = cur.read_u16::<NetworkEndian>().unwrap();
         let product_subid = cur.read_u16::<NetworkEndian>().unwrap();
@@ -1085,12 +1084,12 @@ impl NOAALRITHeader {
 #[derive(Debug, Clone)]
 pub struct HeaderStructureRecord {
     /// Header type, must always be 130
-    header_type: u8,
+    pub header_type: u8,
 
     /// Length of this header record (variable)
-    header_record_lenth: u16,
+    pub header_record_lenth: u16,
 
-    text: String,
+    pub text: String,
 }
 
 impl LRITHeader for HeaderStructureRecord {
@@ -1109,7 +1108,7 @@ impl HeaderStructureRecord {
         let mut buf = Vec::with_capacity(len as usize - 3);
         buf.resize(len as usize - 3, ' ' as u8);
 
-        cur.read_exact(&mut buf);
+        cur.read_exact(&mut buf).ok()?;
         let text = String::from_utf8_lossy(&buf).to_owned().trim().to_owned();
 
         let header = HeaderStructureRecord {
@@ -1162,7 +1161,7 @@ impl ImageDataFunctionRecord {
         let mut buf = Vec::with_capacity(len as usize - 3);
         buf.resize(len as usize - 3, 0u8);
 
-        cur.read_exact(&mut buf);
+        cur.read_exact(&mut buf).ok()?;
 
         let header = ImageDataFunctionRecord {
             header_type: typ,
@@ -1177,16 +1176,16 @@ impl ImageDataFunctionRecord {
 #[derive(Debug, Clone)]
 pub struct TimeStampRecord {
     /// Header type, must always be 5
-    header_type: u8,
+    pub header_type: u8,
 
     /// Length of this header record, must be 10
-    header_record_lenth: u16,
+    pub header_record_lenth: u16,
 
     /// CCSDS time
     ///
     /// CCSDS time is a 2-byte counter of the number of dates from 1 January 1958, followed by
     /// 4-byte coutner of the milliseconds of that day
-    time: [u8; 7],
+    pub time: [u8; 7],
 }
 
 impl LRITHeader for TimeStampRecord {
@@ -1204,7 +1203,7 @@ impl TimeStampRecord {
         let len = cur.read_u16::<NetworkEndian>().unwrap();
 
         let mut time = [0u8; 7];
-        cur.read_exact(&mut time);
+        cur.read_exact(&mut time).ok()?;
 
         let header = TimeStampRecord {
             header_type: typ,
@@ -1219,10 +1218,10 @@ impl TimeStampRecord {
 #[derive(Debug, Clone)]
 pub struct AncillaryTextRecord {
     /// Header type, must always be 6
-    header_type: u8,
+    pub header_type: u8,
 
     /// Length of this header record (variable)
-    header_record_lenth: u16,
+    pub header_record_lenth: u16,
 
     pub text: String,
 }
@@ -1243,7 +1242,7 @@ impl AncillaryTextRecord {
         let mut buf = Vec::with_capacity(len as usize - 3);
         buf.resize(len as usize - 3, ' ' as u8);
 
-        cur.read_exact(&mut buf);
+        cur.read_exact(&mut buf).ok()?;
         let text = String::from_utf8_lossy(&buf).to_owned().trim().to_owned();
 
         let header = AncillaryTextRecord {
@@ -1259,16 +1258,16 @@ impl AncillaryTextRecord {
 #[derive(Debug, Clone)]
 pub struct RiceCompressionSecondaryHeader {
     /// Header type, must always be 131
-    header_type: u8,
+    pub header_type: u8,
 
     /// Length of this header record, must be 7
-    header_record_lenth: u16,
+    pub header_record_lenth: u16,
 
-    flags: u16,
+    pub flags: u16,
 
-    pixels_per_block: u8,
+    pub pixels_per_block: u8,
 
-    scanlines_per_packet: u8,
+    pub scanlines_per_packet: u8,
 }
 
 impl LRITHeader for RiceCompressionSecondaryHeader {
@@ -1307,10 +1306,10 @@ impl RiceCompressionSecondaryHeader {
 #[derive(Debug, Clone)]
 pub struct ImageSegmentIdentificationRecord {
     /// Header type, must always be 128
-    header_type: u8,
+    pub header_type: u8,
 
     /// Length of this header record, must be 17
-    header_record_lenth: u16,
+    pub header_record_lenth: u16,
 
     pub image_id: u16,
 

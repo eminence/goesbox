@@ -18,14 +18,14 @@ pub enum Stat {
 }
 
 pub struct Stats {
-    time: Instant,
-    packets: usize,
-    bytes: usize,
-    fills: usize,
-    discards: usize,
+    pub time: Instant,
+    pub packets: usize,
+    pub bytes: usize,
+    pub fills: usize,
+    pub discards: usize,
     pub vcdu_packets: VecDeque<(Instant, HashMap<u8, usize>)>,
     //vcdu_packets: HashMap<u8, usize>,
-    apid: HashMap<u16, usize>,
+    pub apid: HashMap<u16, usize>,
 }
 
 impl Stats {
@@ -66,7 +66,7 @@ impl Stats {
         }
     }
 
-    fn print(&self) {
+    pub fn print(&self) {
         let secs = self.time.elapsed().as_millis() as f32 / 1000.0;
         println!("==============");
         println!("Total packets: {:0.2} pps", self.packets as f32 / secs);
@@ -81,7 +81,7 @@ impl Stats {
         //}
     }
 
-    fn reset(&mut self) {
+    pub fn reset(&mut self) {
         self.time = Instant::now();
         self.packets = 0;
         self.bytes = 0;

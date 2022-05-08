@@ -72,8 +72,8 @@ impl Handler for DcsHandler {
         t.write_all(&lrit.data)?;
         drop(t);
 
-        for (idx, block) in blocks.into_iter().enumerate() {
-            let pseudo_binary: Vec<_> = block.data.into_iter().skip(1).map(|x| x & 0x7f).collect();
+        for (_idx, block) in blocks.into_iter().enumerate() {
+            let _pseudo_binary: Vec<_> = block.data.into_iter().skip(1).map(|x| x & 0x7f).collect();
 
             // let mut f = std::fs::File::create(self.output_root.join(format!(
             //     "{base_name}-{:0>8X}-{idx:03}.dcs",
@@ -111,16 +111,16 @@ impl Handler for DcsHandler {
 
 /// The header of a DCS packet (64 bytes)
 #[derive(Debug)]
-struct DcsHeader {
-    name: String,
+pub struct DcsHeader {
+    pub name: String,
     /// Entire size of the Dcs packet (including this header)
-    payload_len: u64,
-    payload_source: String,
-    payload_type: String,
+    pub payload_len: u64,
+    pub payload_source: String,
+    pub payload_type: String,
     /// The received CRC for the header fields
-    header_crc: u32,
+    pub header_crc: u32,
     /// The CRC for the entire file (all header bytes and all data bytes)
-    file_crc: u32,
+    pub file_crc: u32,
 }
 
 impl DcsHeader {
@@ -172,7 +172,7 @@ impl DcsHeader {
             .trim()
             .to_string()
             .parse()
-            .map_err(|e| HandlerError::Parse("Failed to parse payload len in DCS header"))?;
+            .map_err(|_e| HandlerError::Parse("Failed to parse payload len in DCS header"))?;
         let payload_source = String::from_utf8_lossy(&source_buf).trim().to_string();
         let payload_type = String::from_utf8_lossy(&payload_type_buf).trim().to_string();
 
@@ -188,13 +188,13 @@ impl DcsHeader {
 }
 
 #[derive(Debug)]
-enum DcsPlatform {
+pub enum DcsPlatform {
     CS1 = 0,
     CS2 = 1,
 }
 
 #[derive(Debug)]
-enum DcsSpacescraft {
+pub enum DcsSpacescraft {
     Unknown = 0,
     GoesEast,
     GoesWest,
@@ -204,7 +204,7 @@ enum DcsSpacescraft {
 }
 
 #[derive(Debug)]
-enum DcsSource {
+pub enum DcsSource {
     /// NOAA WCDA E/W Prime -- Wallops Island, VA
     UP,
     /// NOAA WCDA E/W Backup – Wallops Island, VA
@@ -238,64 +238,64 @@ enum DcsSource {
 ///
 /// After the 64 byte header, there will be a variable number of DcsBlock structs
 #[derive(Debug)]
-struct DcsBlock {
-    block_id: u8,   // 3.2.1
-    block_len: u16, // 3.2.2
-    sequence: u32,  // 3.3.1 table
+pub struct DcsBlock {
+    pub block_id: u8,   // 3.2.1
+    pub block_len: u16, // 3.2.2
+    pub sequence: u32,  // 3.3.1 table
 
     // 3.3.1.1 message flags/baud
     // parity errors used to define 0-ASCII, 1-Pseudo-Binary
-    baud_rate: u16,
-    platform: DcsPlatform,
+    pub baud_rate: u16,
+    pub platform: DcsPlatform,
     /// Message received with parity errors
-    parity_errors: bool,
+    pub parity_errors: bool,
     /// Not EOT received with message
-    missing_eot: bool,
+    pub missing_eot: bool,
     // msg_flag_b6: bool,
     // msg_flag_b7: bool,
 
     // parse arm 3.3.1.2
-    addr_corrected: bool,
+    pub addr_corrected: bool,
 
     /// A bad address (not correctable)
-    bad_addr: bool,
-    invalid_addr: bool,
-    incomplete_pdt: bool,
+    pub bad_addr: bool,
+    pub invalid_addr: bool,
+    pub incomplete_pdt: bool,
 
     /// Timing error (outsie window)
-    timing_error: bool,
-    unexpected_message: bool,
-    wrong_channel: bool,
+    pub timing_error: bool,
+    pub unexpected_message: bool,
+    pub wrong_channel: bool,
     // arm_flag_b7: bool,
     ///The BCH correction of the received Platform Address
     ///
     /// If the address is received without errors or is uncorrectable, this field will
     /// match the Received Address field.
-    corrected_addr: u32,
+    pub corrected_addr: u32,
 
     /// The time when the signal energy was first detected
-    carrier_start: chrono::DateTime<Utc>,
+    pub carrier_start: chrono::DateTime<Utc>,
 
     /// The time when the signal energy was no logner detectable
-    carrier_end: chrono::DateTime<Utc>,
+    pub carrier_end: chrono::DateTime<Utc>,
 
     /// Received message Signal strength in dBm
-    signal_strength: f32,
+    pub signal_strength: f32,
 
     /// Frequency offset from the channel center of the received message
-    freq_offset: f32,
+    pub freq_offset: f32,
 
     /// Phase noise in degrees RMS of the received mesage
-    phase_noise: f32,
+    pub phase_noise: f32,
     // phase_mod_quality: String,
-    good_phase: f32,
+    pub good_phase: f32,
 
-    space_platform: DcsSpacescraft,
-    channel_number: u16,
+    pub space_platform: DcsSpacescraft,
+    pub channel_number: u16,
 
-    source_platform: DcsSource,
+    pub source_platform: DcsSource,
 
-    data: Vec<u8>,
+    pub data: Vec<u8>,
 }
 
 impl DcsBlock {

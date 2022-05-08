@@ -1463,7 +1463,6 @@ impl GeographicalAreaDesignator {
             'U' => Some(GeographicalAreaDesignator::UnknownU),
             'P' => Some(GeographicalAreaDesignator::UnknownP),
             x => panic!("unknown c3: {}", x),
-            _ => None,
         }
     }
 }

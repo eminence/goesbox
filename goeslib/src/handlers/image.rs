@@ -177,12 +177,12 @@ impl ImageHandler {
         for lrit in segments {
             if let Some(lrit) = lrit {
                 let seg = lrit.headers.img_segment.as_ref().expect("img_segment header");
-                let ihs = lrit.headers.img_strucutre.as_ref().expect("img_structure header");
+                // let ihs = lrit.headers.img_strucutre.as_ref().expect("img_structure header");
 
                 let start = seg.max_column as usize * seg.start_line as usize;
                 //let end = start + (ihs.num_lines  as usize * seg.max_column as usize);
                 let end = start + lrit.data.len();
-                &pixels[start..end].copy_from_slice(&lrit.data);
+                pixels[start..end].copy_from_slice(&lrit.data);
                 //pixels.extend(lrit.data);
                 //
                 //} else {

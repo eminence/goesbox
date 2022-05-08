@@ -1,6 +1,6 @@
 use std::{io::Write, path::PathBuf};
 
-use log::{info, warn};
+use log::info;
 
 use crate::lrit::LRIT;
 
@@ -39,7 +39,7 @@ impl Handler for TextHandler {
             for idx in 0..archive.len() {
                 if let Ok(mut file) = archive.by_index(idx) {
                     //info!("Zip archive file {}", file.name());
-                    let mut output_file = std::fs::File::create(self.output_root.join(file.sanitized_name()))?;
+                    let mut output_file = std::fs::File::create(self.output_root.join(file.mangled_name()))?;
                     std::io::copy(&mut file, &mut output_file)?;
                 }
             }
