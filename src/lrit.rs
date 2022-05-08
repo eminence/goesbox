@@ -22,6 +22,8 @@ fn diff_with_wrap(low: u32, high: u32, max: u32) -> u32 {
 
 #[derive(Clone)]
 pub struct LRIT {
+    /// The vcid (virtual channel id) that this LRIT file came in on
+    pub vcid: u8,
     pub headers: Headers,
     pub data: Vec<u8>,
 }
@@ -309,6 +311,8 @@ struct Session {
     last_seq: u16,
     apid: u16,
     needs_decomp: DecompInfo,
+    /// The vcid (virtual channel id) of the session
+    vcid: u8,
 }
 
 /// Returns true if we need to decompress
@@ -396,6 +400,7 @@ impl Session {
             bytes,
             apid,
             needs_decomp,
+            vcid: pdu.vcid,
         }
     }
 
@@ -461,7 +466,7 @@ impl Session {
             //info!("{:?}", headers);
             //info!("ish.cols={}, datalen={}", ish.num_columns, data.len());
         }
-        return LRIT { headers, data };
+        return LRIT { vcid: self.vcid, headers, data };
         //info!("Headers: {:?}", headers);
 
         //let root = std::path::Path::new("/nas/achin/devel/goes-dht/out_new");
