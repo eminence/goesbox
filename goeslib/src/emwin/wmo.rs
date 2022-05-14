@@ -871,6 +871,13 @@ pub enum AreaDesignator {
     Cyprus,
     Czechia,
 
+    Bonaire,
+    Djibouti,
+    Germany,
+    Denmark,
+    Dominica,
+    DominicanRepublic,
+
     Egypt,
     Eritrea,
     Estonia,
@@ -914,6 +921,21 @@ pub enum AreaDesignator {
     BurkinaFaso,
     HawaiianIslands,
 
+    Comoros,
+    Indonesia,
+    Ireland,
+    Iceland,
+    India,
+    Iraq,
+    IslamicRepublicOfIran,
+    Israel,
+    CotedIvoire,
+    Italy,
+
+    Jordan,
+    Jamaica,
+    Japan,
+
     CarolineIslands,
     Kiribati,
     ChristmasIsland,
@@ -928,6 +950,17 @@ pub enum AreaDesignator {
     Kuwait,
     Kyrgyzstan,
     Kazakhstan,
+
+    LaoPeopleDemocraticRepublic,
+    Lebanon,
+    SaintLucia,
+    Liberia,
+    Slovenia,
+    SouthernLineIslands,
+    Lesotho,
+    Lithuania,
+    Latvia,
+    Libya,
 
     Mauritius,
     MarionIsland,
@@ -967,6 +1000,11 @@ pub enum AreaDesignator {
     Nauru,
     NewZealand,
 
+    Oman,
+    Monaco,
+    SouthOrkneyIslands,
+    Austria,
+
     FrenchPolynesia,
     Philippines,
     PhoenixIslands,
@@ -979,6 +1017,17 @@ pub enum AreaDesignator {
     Pitcairn,
     PuertoRico,
     Paraguay,
+
+    BosniaAndHerzegovina,
+    Qatar,
+
+    RussianFedereationEast,
+    Reunion,
+    Croatia,
+    RepublicOfMoldova,
+    Romania,
+    RussianFedereationWest,
+    Rwanda,
 
     SriLanka,
     Seychelles,
@@ -1023,8 +1072,13 @@ pub enum AreaDesignator {
     Uruguay,
     Uzbekistan,
 
+    SaintVincentAndTheGrenadines,
+    VirginIslands,
+    Venezuela,
+    Vietnam,
+
     Yemen,
-    Servia,
+    Serbia,
 
     SouthAfrica,
     Zambia,
@@ -1045,6 +1099,8 @@ pub enum AreaDesignator {
     NearEastArea,
     ArabianSeaArea,
 
+    BalticSeaArea,
+
     CaribbeanAndCentralAmerica,
 
     EastAfricaArea,
@@ -1062,8 +1118,16 @@ pub enum AreaDesignator {
 
     IndianOceanArea,
 
+    EasternMiditerraneanArea,
+    MediterraneanArea,
+    CentralMediterraneanArea,
+    WesternMediterraneanArea,
+
     NorthAmericaArea,
     NorthAtlanticArea,
+
+    OceaniaArea,
+    SeaOfOkhotskArea,
 
     PacificArea,
     PersianGulfArea,
@@ -1078,6 +1142,12 @@ pub enum AreaDesignator {
     SeaOfJapanArea,
     SouthChinaseaArea,
     SouthAtlanticArea,
+
+    EasternHemisphereArea,
+    NorthernHemisphereArea,
+    SouthernHemisphereArea,
+    TropicalBeltArea,
+    WesternHemisphereArea,
 
     // unknown areas that are not in the WMO manual but are common in NWS data
     HNUnknown,
@@ -1139,6 +1209,13 @@ impl AreaDesignator {
             "CY" => AreaDesignator::Cyprus,
             "CZ" => AreaDesignator::Czechia,
 
+            "DC" => AreaDesignator::Bonaire,
+            "DJ" => AreaDesignator::Djibouti,
+            "DL" => AreaDesignator::Germany,
+            "DN" => AreaDesignator::Denmark,
+            "DO" => AreaDesignator::Dominica,
+            "DR" => AreaDesignator::DominicanRepublic,
+
             "EG" => AreaDesignator::Egypt,
             "EI" => AreaDesignator::Eritrea,
             "EO" => AreaDesignator::Estonia,
@@ -1182,6 +1259,21 @@ impl AreaDesignator {
             "HV" => AreaDesignator::BurkinaFaso,
             "HW" => AreaDesignator::HawaiianIslands,
 
+            "IC" => AreaDesignator::Comoros,
+            "ID" => AreaDesignator::Indonesia,
+            "IE" => AreaDesignator::Ireland,
+            "IL" => AreaDesignator::Iceland,
+            "IN" => AreaDesignator::India,
+            "IQ" => AreaDesignator::Iraq,
+            "IR" => AreaDesignator::IslamicRepublicOfIran,
+            "IS" => AreaDesignator::Israel,
+            "IV" => AreaDesignator::CotedIvoire,
+            "IY" => AreaDesignator::Italy,
+
+            "JD" => AreaDesignator::Jordan,
+            "JM" => AreaDesignator::Jamaica,
+            "JP" => AreaDesignator::Japan,
+
             "KA" => AreaDesignator::CarolineIslands,
             "KB" => AreaDesignator::Kiribati,
             "KI" => AreaDesignator::ChristmasIsland,
@@ -1194,6 +1286,17 @@ impl AreaDesignator {
             "KW" => AreaDesignator::Kuwait,
             "KY" => AreaDesignator::Kyrgyzstan,
             "KZ" => AreaDesignator::Kazakhstan,
+
+            "LA" => AreaDesignator::LaoPeopleDemocraticRepublic,
+            "LB" => AreaDesignator::Lebanon,
+            "LC" => AreaDesignator::SaintLucia,
+            "LI" => AreaDesignator::Liberia,
+            "LJ" => AreaDesignator::Slovenia,
+            "LN" => AreaDesignator::SouthernLineIslands,
+            "LS" => AreaDesignator::Lesotho,
+            "LT" => AreaDesignator::Lithuania,
+            "LV" => AreaDesignator::Latvia,
+            "LY" => AreaDesignator::Libya,
 
             "MA" => AreaDesignator::Mauritius,
             "MB" => AreaDesignator::MarionIsland,
@@ -1233,6 +1336,11 @@ impl AreaDesignator {
             "NW" => AreaDesignator::Nauru,
             "NZ" => AreaDesignator::NewZealand,
 
+            "OM" => AreaDesignator::Oman,
+            "OO" => AreaDesignator::Monaco,
+            "OR" => AreaDesignator::SouthOrkneyIslands,
+            "OS" => AreaDesignator::Austria,
+
             "PF" => AreaDesignator::FrenchPolynesia,
             "PH" => AreaDesignator::Philippines,
             "PI" => AreaDesignator::PhoenixIslands,
@@ -1245,6 +1353,17 @@ impl AreaDesignator {
             "PT" => AreaDesignator::Pitcairn,
             "PU" => AreaDesignator::PuertoRico,
             "PY" => AreaDesignator::Paraguay,
+
+            "QB" => AreaDesignator::BosniaAndHerzegovina,
+            "QT" => AreaDesignator::Qatar,
+
+            "RA" => AreaDesignator::RussianFedereationEast,
+            "RE" => AreaDesignator::Reunion,
+            "RH" => AreaDesignator::Croatia,
+            "RM" => AreaDesignator::RepublicOfMoldova,
+            "RO" => AreaDesignator::Romania,
+            "RS" => AreaDesignator::RussianFedereationWest,
+            "RW" => AreaDesignator::Rwanda,
 
             "SB" => AreaDesignator::SriLanka,
             "SC" => AreaDesignator::Seychelles,
@@ -1289,6 +1408,14 @@ impl AreaDesignator {
             "UY" => AreaDesignator::Uruguay,
             "UZ" => AreaDesignator::Uzbekistan,
 
+            "VG" => AreaDesignator::SaintVincentAndTheGrenadines,
+            "VI" => AreaDesignator::VirginIslands,
+            "VN" => AreaDesignator::Venezuela,
+            "VS" => AreaDesignator::Vietnam,
+
+            "YE" => AreaDesignator::Yemen,
+            "YG" => AreaDesignator::Serbia,
+
             "ZA" => AreaDesignator::SouthAfrica,
             "ZB" => AreaDesignator::Zambia,
             "ZM" => AreaDesignator::Samoa,
@@ -1308,6 +1435,8 @@ impl AreaDesignator {
             "AW" => AreaDesignator::NearEastArea,
             "AX" => AreaDesignator::ArabianSeaArea,
 
+            "BQ" => AreaDesignator::BalticSeaArea,
+
             "CA" => AreaDesignator::CaribbeanAndCentralAmerica,
 
             "EA" => AreaDesignator::EastAfricaArea,
@@ -1325,8 +1454,16 @@ impl AreaDesignator {
 
             "IO" => AreaDesignator::IndianOceanArea,
 
+            "ME" => AreaDesignator::EasternMiditerraneanArea,
+            "MM" => AreaDesignator::MediterraneanArea,
+            "MP" => AreaDesignator::CentralMediterraneanArea,
+            "MQ" => AreaDesignator::WesternMediterraneanArea,
+
             "NA" => AreaDesignator::NorthAmericaArea,
             "NT" => AreaDesignator::NorthAtlanticArea,
+
+            "OC" => AreaDesignator::OceaniaArea,
+            "OH" => AreaDesignator::SeaOfOkhotskArea,
 
             "PA" => AreaDesignator::PacificArea,
             "PE" => AreaDesignator::PersianGulfArea,
@@ -1341,6 +1478,12 @@ impl AreaDesignator {
             "SJ" => AreaDesignator::SeaOfJapanArea,
             "SS" => AreaDesignator::SouthChinaseaArea,
             "ST" => AreaDesignator::SouthAtlanticArea,
+
+            "XE" => AreaDesignator::EasternHemisphereArea,
+            "XN" => AreaDesignator::NorthernHemisphereArea,
+            "XS" => AreaDesignator::SouthernHemisphereArea,
+            "XT" => AreaDesignator::TropicalBeltArea,
+            "XW" => AreaDesignator::WesternHemisphereArea,
 
             "HN" => AreaDesignator::HNUnknown,
 
