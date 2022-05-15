@@ -5,7 +5,7 @@ use std::{
 
 use log::info;
 
-use crate::lrit::LRIT;
+use crate::{emwin, lrit::LRIT};
 
 use super::{Handler, HandlerError};
 
@@ -42,16 +42,49 @@ impl Handler for TextHandler {
             for idx in 0..archive.len() {
                 if let Ok(mut file) = archive.by_index(idx) {
                     //info!("Zip archive file {}", file.name());
-                    let mut output_file = std::fs::File::create(self.output_root.join(file.mangled_name()))?;
+                    let output_path = self.output_root.join(file.mangled_name());
+                    let filename = file.mangled_name();
+                    let filename = filename.to_string_lossy();
+                    let mut output_file = std::fs::File::create(&output_path)?;
                     std::io::copy(&mut file, &mut output_file)?;
+
+                    if lrit.vcid == 20 || lrit.vcid == 21 || lrit.vcid == 22 {
+                        if filename.starts_with("A_") || filename.starts_with("Z_") {
+                            if let Some(parsed_emwin) = emwin::ParsedEmwinName::parse(&filename) {
+                                let latest_symlink = self
+                                    .output_root
+                                    .join(format!("latest-{}", parsed_emwin.legacy_filename));
+                                if latest_symlink.exists() {
+                                    std::fs::remove_file(&latest_symlink)?;
+                                }
+                                std::os::unix::fs::symlink(&output_path, latest_symlink)?;
+                            }
+                        }
+                    }
                 }
             }
         } else {
             // try to print data
             //let s = String::from_utf8_lossy(&self.bytes[offset as usize..]);
             if let Some(annotation) = &lrit.headers.annotation {
-                if let Ok(mut output_file) = std::fs::File::create(self.output_root.join(&annotation.text)) {
+                let output_path = self.output_root.join(&annotation.text);
+                if let Ok(mut output_file) = std::fs::File::create(&output_path) {
                     output_file.write_all(&lrit.data)?;
+                }
+
+                // Is this a EMWIN product?
+                if lrit.vcid == 20 || lrit.vcid == 21 || lrit.vcid == 22 {
+                    if annotation.text.starts_with("A_") || annotation.text.starts_with("Z_") {
+                        if let Some(parsed_emwin) = emwin::ParsedEmwinName::parse(&annotation.text) {
+                            let latest_symlink = self
+                                .output_root
+                                .join(format!("latest-{}", parsed_emwin.legacy_filename));
+                            if latest_symlink.exists() {
+                                std::fs::remove_file(&latest_symlink)?;
+                            }
+                            std::os::unix::fs::symlink(&output_path, latest_symlink)?;
+                        }
+                    }
                 }
             }
             //info!("uncompressed string data: {}", s);
