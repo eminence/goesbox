@@ -9,7 +9,7 @@ use std::{
 
 use byteorder::{LittleEndian, ReadBytesExt};
 use chrono::Utc;
-use log::{info, warn};
+use log::{debug, info, warn};
 
 use crate::{crc, handlers::HandlerError};
 
@@ -51,26 +51,17 @@ impl Handler for DcsHandler {
             return Err(HandlerError::MissingHeader("annotation"));
         };
 
-        info!("DCS packet has {} bytes of data", lrit.data.len());
-
         let header = DcsHeader::parse(&lrit.data[..])?;
         if header.payload_type != "DCSH" {
             warn!("Expected DCSH payload type, got {:?}", header.payload_type);
             return Err(HandlerError::Parse("Expected DCSH payload type"));
         }
-        info!("{:?}", header);
+        debug!("{:?}", header);
 
         assert_eq!(header.payload_len as usize, lrit.data.len());
 
         let blocks = DcsBlock::parse(&lrit.data[64..])?;
-        info!("Found {} blocks", blocks.len());
-
-        let base_name = annotation.text.trim_end_matches(".lrit");
-
-        // TEMP DELETE ME (dump raw LRIT file for debugging)
-        let mut t = File::create(self.output_root.join(base_name).with_extension("raw_lrit"))?;
-        t.write_all(&lrit.data)?;
-        drop(t);
+        debug!("Found {} blocks", blocks.len());
 
         for (_idx, block) in blocks.into_iter().enumerate() {
             let _pseudo_binary: Vec<_> = block.data.into_iter().skip(1).map(|x| x & 0x7f).collect();
@@ -322,11 +313,14 @@ impl DcsBlock {
                 // we don't know how to parse this block, so skip forward to the next one
                 // Since we've already read 3 bytes (1 for ID, 2 for len), the total bytes to skip os the block_len - 3
                 // TODO handle block_id 2 (which is fully described in HRIT_DCS_File_Format_Rev1.pdf)
-                warn!(
-                    "Skipping unknown DCS block id {}, skipping {} bytes",
-                    block_id,
-                    block_len - 3
-                );
+                if block_id != 2 {
+                    warn!(
+                        "Skipping unknown DCS block id {}, skipping {} bytes",
+                        block_id,
+                        block_len - 3
+                    );
+                }
+
                 cur.seek(SeekFrom::Current(block_len as i64 - 3))?;
                 continue;
             }
